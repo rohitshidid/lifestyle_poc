@@ -9,8 +9,20 @@ _Last updated: 2026-07-23_
 ## Architectural Overview
 _High-level description of the project structure and how the pieces fit together._
 
-`lifestyle_poc` is currently a proof-of-concept scaffold. No application code exists
-yet — the repository contains only project documentation and IHMS state files.
+`lifestyle_poc` is a proof-of-concept for a **concierge / lifestyle-management
+platform for touring musicians**. Artists onboard once; the platform stores their
+preferences and manages bookings/logistics (housing, hotels, restaurants, food
+preferences, transport, etc.) on their behalf.
+
+The intended domain revolves around a few core concepts (design not yet built):
+- **Artist** and their **Preference Profile** (the persistent, learning source of truth).
+- **Tour / Itinerary** — the central timeline; bookings attach to a city + date.
+- **Booking** — a lodging/dining/transport reservation driven by the profile.
+- **Vendor / Partner** — hotels, restaurants, drivers, with reliability ratings.
+- **Feedback** — post-experience signal that refines the Preference Profile.
+
+Currently no application code exists — the repository contains only project
+documentation and IHMS state files. The project is in the brainstorming/discovery phase.
 
 ## File Index
 _A detailed registry of what each file does and its exact location._

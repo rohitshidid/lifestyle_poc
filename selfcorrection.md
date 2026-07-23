@@ -10,16 +10,25 @@ _Last updated: 2026-07-23_
 ## Coding Preferences
 _Specific coding preferences and stylistic choices issued by the user._
 
-- _None recorded yet._
+- During brainstorming/discovery, do NOT write code — respond with suggestions and
+  clarifying questions only, until told otherwise.
 
 ## Stylistic Choices
 _Formatting, naming, and structural conventions the user prefers._
 
 - _None recorded yet._
 
+## Git & Attribution Preferences
+_How commits must be made._
+
+- Commit to the `main` branch.
+- Author & committer: Rohit Shidid <rohitshidid@gmail.com> ("committed by me").
+- No resemblance of Claude / AI in any commit message, author, committer, or trailer.
+
 ## Past Corrections
 _A cumulative log of corrections issued during development, with dates._
 
 | Date | Correction / Preference | Context |
 | ---- | ----------------------- | ------- |
-| _—_  | _None recorded yet._    | _—_     |
+| 2026-07-23 | Commit to `main`, authored as Rohit Shidid <rohitshidid@gmail.com>, no AI attribution anywhere. | Initial commit of IHMS state files. |
+| 2026-07-23 | In brainstorming phase: no code — suggestions/questions only. | Musician concierge platform discovery. |
