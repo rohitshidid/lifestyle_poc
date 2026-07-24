@@ -1,0 +1,15 @@
+{
+  "name": "lifestyle_poc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Concierge platform for touring musicians — natural-language hotel finder that matches dietary, allergy, and lifestyle constraints.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "latest",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}

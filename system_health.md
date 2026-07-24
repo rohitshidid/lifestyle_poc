@@ -3,7 +3,7 @@
 > Maintained by the IHMS (Intelligent Health Monitoring System).
 > Tracks the active state and trajectory of the project. Updated after every interaction.
 
-_Last updated: 2026-07-23_
+_Last updated: 2026-07-24_
 
 ## Product Vision
 A concierge / lifestyle-management platform for touring musicians. Artists (and/or
@@ -26,36 +26,39 @@ own preferences again.
 ## Non-Negotiables
 _Core architectural rules, tech stack constraints, and absolute boundaries._
 
-- _Tech stack not yet chosen — TBD during discovery._
+- Tech stack (POC): Node.js + Express backend, vanilla HTML/CSS/JS frontend.
+- LLM provider: Anthropic Claude, model `claude-opus-4-8`, via the official
+  `@anthropic-ai/sdk`. Hotel links come from the Claude `web_search` server tool —
+  never fabricate links.
+- Secrets (`ANTHROPIC_API_KEY`) live only in `.env` (gitignored), never committed.
 
 ## Active Rules
 _Current development guidelines in effect._
 
-- No code is to be written yet — currently in the brainstorming / product-discovery phase.
 - Git: commits go to `main`, authored/committed as Rohit Shidid <rohitshidid@gmail.com>,
   with no AI attribution in messages, authors, or trailers. (See `selfcorrection.md`.)
 
 ## Current Tasks
 _The macro-level task currently being worked on._
 
-- Product discovery & scoping for the musician concierge platform (brainstorming, no code).
+- Build and iterate on the natural-language hotel finder (paragraph in → parsed
+  constraints + matching hotel links out).
 
 ## Micro-tasks
 _A granular checklist of the immediate next steps needed to complete the current task._
 
-- [x] Capture the product vision and core domain concepts
-- [ ] Confirm customer & payer (artist vs. tour manager / management / label)
-- [ ] Confirm MVP ambition (white-glove concierge for few vs. scalable self-serve)
-- [ ] Decide booking approach (direct vendor partnerships vs. aggregator APIs)
-- [ ] Confirm geography scope (domestic vs. international)
-- [ ] Confirm revenue model (subscription / commission / retainer)
-- [ ] Pick the wedge vertical to prove the concept first
-- [ ] Draft domain model + phased roadmap once the above are answered
+- [x] Choose stack (Node/Express + vanilla frontend + Claude web search)
+- [x] Backend `POST /api/search` endpoint calling Claude with the web_search tool
+- [x] Frontend: request textbox + parsed-constraints section + hotel-results section
+- [x] README run instructions, `.env.example`, `.gitignore`
+- [ ] End-to-end test with a real `ANTHROPIC_API_KEY`
+- [ ] Handle edge cases (no location given, no results, web-search rate limits)
+- [ ] Optional: persist a Preference Profile so constraints don't need re-typing
 
 ## Upcoming Goals
 _The roadmap of future features or refactoring._
 
-- Define the domain model (Artist, Preference Profile, Tour, Booking, Vendor, Feedback).
-- Design the internal ops/concierge dashboard (concierge-first approach).
-- Plan preference-learning / feedback loop.
-- Evaluate vendor-network vs. aggregator-API integration strategy.
+- Persist Preference Profiles per artist (the product's moat).
+- Extend beyond hotels to restaurants, transport, and full tour itineraries.
+- Add a post-experience feedback loop that refines the profile.
+- Vendor/partner network with reliability ratings.

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IHMS Concierge — Musician Lifestyle POC</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #1a1d24;
+      --panel-2: #222630;
+      --line: #2c313c;
+      --text: #e8eaf0;
+      --muted: #9aa2b1;
+      --accent: #e0a458;
+      --accent-2: #6fb1a0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      padding: 32px 24px 8px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    header h1 { margin: 0 0 4px; font-size: 1.6rem; }
+    header p { margin: 0; color: var(--muted); }
+    main { max-width: 900px; margin: 0 auto; padding: 16px 24px 64px; }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    section h2 { margin: 0 0 12px; font-size: 1.05rem; }
+    textarea {
+      width: 100%;
+      min-height: 130px;
+      resize: vertical;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+      font: inherit;
+    }
+    .row { display: flex; gap: 12px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+    button {
+      background: var(--accent);
+      color: #201502;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 20px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.6; cursor: default; }
+    .hint { color: var(--muted); font-size: 0.85rem; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 0.82rem;
+    }
+    .chip.diet { border-color: var(--accent-2); color: var(--accent-2); }
+    .chip.allergy { border-color: #d9705f; color: #d9705f; }
+    .field-label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; margin: 12px 0 6px; }
+    .hotel {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 12px;
+      background: var(--panel-2);
+    }
+    .hotel h3 { margin: 0 0 4px; font-size: 1.05rem; }
+    .hotel a { color: var(--accent); text-decoration: none; }
+    .hotel a:hover { text-decoration: underline; }
+    .hotel .meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 8px; }
+    .hotel .notes { margin: 8px 0 0; }
+    .hidden { display: none; }
+    .spinner { color: var(--muted); }
+    .error { color: #d9705f; }
+    .tier { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 8px; border-radius: 6px; background: var(--panel); border: 1px solid var(--line); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎧 IHMS Concierge</h1>
+    <p>Describe your trip and constraints in plain language. We extract your needs and find hotels that fit.</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Tell us what you need</h2>
+      <textarea id="request" placeholder="e.g. I'm playing two shows in Berlin next month. I'm vegan and severely allergic to tree nuts. I want a quiet room away from the elevator, a hotel with a gym, ideally walking distance to Mitte, mid-range budget."></textarea>
+      <div class="row">
+        <button id="go">Find hotels</button>
+        <span class="hint">Powered by Claude with live web search.</span>
+      </div>
+    </section>
+
+    <section id="status" class="hidden">
+      <span id="statusText" class="spinner">Searching…</span>
+    </section>
+
+    <section id="parsed" class="hidden">
+      <h2>What we understood</h2>
+      <div class="field-label">Location</div>
+      <div id="loc"></div>
+      <div class="field-label">Dietary</div>
+      <div id="diet" class="chips"></div>
+      <div class="field-label">Allergies</div>
+      <div id="allergy" class="chips"></div>
+      <div class="field-label">Other preferences</div>
+      <div id="prefs" class="chips"></div>
+    </section>
+
+    <section id="results" class="hidden">
+      <h2>Matching hotels</h2>
+      <div id="hotels"></div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const chips = (el, items, cls = "") => {
+      el.innerHTML = "";
+      if (!items || !items.length) { el.innerHTML = '<span class="hint">None specified</span>'; return; }
+      for (const it of items) {
+        const s = document.createElement("span");
+        s.className = "chip " + cls;
+        s.textContent = it;
+        el.appendChild(s);
+      }
+    };
+
+    async function search() {
+      const request = $("request").value.trim();
+      if (!request) { $("request").focus(); return; }
+
+      $("go").disabled = true;
+      $("status").classList.remove("hidden");
+      $("statusText").className = "spinner";
+      $("statusText").textContent = "Reading your request and searching hotels… this can take 20–40s.";
+      $("parsed").classList.add("hidden");
+      $("results").classList.add("hidden");
+
+      try {
+        const r = await fetch("/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ request }),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || "Request failed");
+
+        // Parsed constraints
+        const p = data.parsed || {};
+        $("loc").textContent = p.location || "Not detected — please mention a city.";
+        chips($("diet"), p.dietary, "diet");
+        chips($("allergy"), p.allergies, "allergy");
+        chips($("prefs"), p.otherPreferences);
+        $("parsed").classList.remove("hidden");
+
+        // Hotels
+        const wrap = $("hotels");
+        wrap.innerHTML = "";
+        const hotels = data.hotels || [];
+        if (!hotels.length) {
+          wrap.innerHTML = '<p class="hint">No matching hotels found. Try adding a city or loosening a constraint.</p>';
+        } else {
+          for (const h of hotels) {
+            const div = document.createElement("div");
+            div.className = "hotel";
+            const matches = (h.matches || []).map((m) => `<span class="chip">${m}</span>`).join(" ");
+            div.innerHTML = `
+              <h3>${h.url ? `<a href="${h.url}" target="_blank" rel="noopener">${h.name}</a>` : h.name}</h3>
+              <div class="meta">${h.location || ""} ${h.priceTier ? `· <span class="tier">${h.priceTier}</span>` : ""}</div>
+              <div class="chips">${matches}</div>
+              ${h.notes ? `<p class="notes">${h.notes}</p>` : ""}
+            `;
+            wrap.appendChild(div);
+          }
+        }
+        $("results").classList.remove("hidden");
+        $("status").classList.add("hidden");
+      } catch (e) {
+        $("statusText").className = "error";
+        $("statusText").textContent = "Error: " + e.message;
+      } finally {
+        $("go").disabled = false;
+      }
+    }
+
+    $("go").addEventListener("click", search);
+  </script>
+</body>
+</html>
