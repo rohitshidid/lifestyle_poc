@@ -27,10 +27,10 @@ own preferences again.
 _Core architectural rules, tech stack constraints, and absolute boundaries._
 
 - Tech stack (POC): Node.js + Express backend, vanilla HTML/CSS/JS frontend.
-- LLM provider: Anthropic Claude, model `claude-opus-4-8`, via the official
-  `@anthropic-ai/sdk`. Hotel links come from the Claude `web_search` server tool —
+- LLM provider: Google Gemini, model `gemini-2.5-flash`, via the official
+  `@google/genai` SDK. Hotel links come from the `googleSearch` grounding tool —
   never fabricate links.
-- Secrets (`ANTHROPIC_API_KEY`) live only in `.env` (gitignored), never committed.
+- Secrets (`GEMINI_API_KEY`) live only in `.env` (gitignored), never committed.
 
 ## Active Rules
 _Current development guidelines in effect._
@@ -47,12 +47,13 @@ _The macro-level task currently being worked on._
 ## Micro-tasks
 _A granular checklist of the immediate next steps needed to complete the current task._
 
-- [x] Choose stack (Node/Express + vanilla frontend + Claude web search)
-- [x] Backend `POST /api/search` endpoint calling Claude with the web_search tool
+- [x] Choose stack (Node/Express + vanilla frontend + Gemini Google Search)
+- [x] Backend `POST /api/search` endpoint calling Gemini with the googleSearch tool
 - [x] Frontend: request textbox + parsed-constraints section + hotel-results section
 - [x] README run instructions, `.env.example`, `.gitignore`
-- [ ] End-to-end test with a real `ANTHROPIC_API_KEY`
-- [ ] Handle edge cases (no location given, no results, web-search rate limits)
+- [x] Switch LLM provider from Anthropic Claude to Google Gemini (per user request)
+- [ ] End-to-end test with a real `GEMINI_API_KEY`
+- [ ] Handle edge cases (no location given, no results, search rate limits)
 - [ ] Optional: persist a Preference Profile so constraints don't need re-typing
 
 ## Upcoming Goals

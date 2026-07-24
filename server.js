@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -10,13 +10,14 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-const client = new Anthropic(); // reads ANTHROPIC_API_KEY from env
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-const MODEL = "claude-opus-4-8";
+const MODEL = "gemini-2.5-flash";
 
-// The model extracts constraints from the free-text request, searches the web
-// for hotels in the requested location that satisfy those constraints, and
-// returns a single JSON object at the end of its reply that we parse and serve.
+// The model extracts constraints from the free-text request, uses Google Search
+// grounding to find hotels in the requested location that satisfy those
+// constraints, and returns a single JSON object at the end of its reply that we
+// parse and serve.
 const SYSTEM_PROMPT = `You are the Intelligent Health Monitoring System's hotel concierge for touring musicians.
 
 The user gives you a free-form paragraph describing what they are looking for. It may include:
@@ -27,7 +28,7 @@ The user gives you a free-form paragraph describing what they are looking for. I
 
 Your job:
 1. Extract the location and every constraint from the paragraph.
-2. Use web search to find real hotels in that location that plausibly match the constraints, paying special attention to dietary needs and allergies (on-site restaurant options, kitchenettes, allergy-friendly kitchens, nearby suitable restaurants).
+2. Use Google Search to find real hotels in that location that plausibly match the constraints, paying special attention to dietary needs and allergies (on-site restaurant options, kitchenettes, allergy-friendly kitchens, nearby suitable restaurants).
 3. Return the results.
 
 After any searching, end your reply with EXACTLY ONE fenced JSON code block (\`\`\`json ... \`\`\`) and nothing after it, in this shape:
@@ -69,28 +70,18 @@ app.post("/api/search", async (req, res) => {
     return res.status(400).json({ error: "Please describe what you are looking for." });
   }
 
-  const tools = [{ type: "web_search_20260209", name: "web_search", max_uses: 6 }];
-  const messages = [{ role: "user", content: request }];
-
   try {
-    let response;
-    // Server-side web search can pause the turn; re-send until it completes.
-    for (let i = 0; i < 6; i++) {
-      response = await client.messages.create({
-        model: MODEL,
-        max_tokens: 8000,
-        system: SYSTEM_PROMPT,
-        tools,
-        messages,
-      });
-      if (response.stop_reason !== "pause_turn") break;
-      messages.push({ role: "assistant", content: response.content });
-    }
+    const response = await ai.models.generateContent({
+      model: MODEL,
+      contents: request,
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        maxOutputTokens: 8000,
+        tools: [{ googleSearch: {} }],
+      },
+    });
 
-    const text = response.content
-      .filter((b) => b.type === "text")
-      .map((b) => b.text)
-      .join("\n");
+    const text = response.text || "";
 
     let data;
     try {

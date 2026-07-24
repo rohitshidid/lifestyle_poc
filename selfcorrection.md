@@ -18,6 +18,12 @@ _Formatting, naming, and structural conventions the user prefers._
 
 - _None recorded yet._
 
+## Provider Preferences
+_Which third-party services to use._
+
+- LLM provider: **Google Gemini** (`@google/genai`, `gemini-2.5-flash`), not Anthropic.
+  Switched on 2026-07-24 per user request.
+
 ## Git & Attribution Preferences
 _How commits must be made._
 
@@ -33,3 +39,4 @@ _A cumulative log of corrections issued during development, with dates._
 | 2026-07-23 | Commit to `main`, authored as Rohit Shidid <rohitshidid@gmail.com>, no AI attribution anywhere. | Initial commit of IHMS state files. |
 | 2026-07-23 | In brainstorming phase: no code — suggestions/questions only. | Musician concierge platform discovery. |
 | 2026-07-24 | Build phase active — implement the requested website. | Natural-language hotel finder. |
+| 2026-07-24 | Use the Gemini API instead of Anthropic Claude. | LLM provider switch. |
