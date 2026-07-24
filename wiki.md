@@ -24,6 +24,10 @@ Request flow:
 `generateContent` with the `googleSearch` tool → JSON `{ parsed, hotels }` →
 rendered as the "What we understood" and "Matching hotels" sections.
 
+Status: the Gemini-backed hotel finder is working end-to-end against a live
+`GEMINI_API_KEY` (verified 2026-07-24). The AI/ML roadmap for hardening it into a
+full concierge is tracked in `system_health.md` → Upcoming Goals.
+
 Intended domain concepts (partially realised):
 - **Artist** and their **Preference Profile** (persistent source of truth — not yet
   persisted; today constraints are parsed per request).

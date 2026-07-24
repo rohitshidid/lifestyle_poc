@@ -52,14 +52,53 @@ _A granular checklist of the immediate next steps needed to complete the current
 - [x] Frontend: request textbox + parsed-constraints section + hotel-results section
 - [x] README run instructions, `.env.example`, `.gitignore`
 - [x] Switch LLM provider from Anthropic Claude to Google Gemini (per user request)
-- [ ] End-to-end test with a real `GEMINI_API_KEY`
+- [x] End-to-end test with a real `GEMINI_API_KEY` — confirmed working by user 2026-07-24
+- [x] Draft AI/ML robustness roadmap (see Upcoming Goals)
+- [ ] Decide which roadmap item to build next (recommended: Preference Profile)
 - [ ] Handle edge cases (no location given, no results, search rate limits)
-- [ ] Optional: persist a Preference Profile so constraints don't need re-typing
 
 ## Upcoming Goals
 _The roadmap of future features or refactoring._
 
-- Persist Preference Profiles per artist (the product's moat).
-- Extend beyond hotels to restaurants, transport, and full tour itineraries.
-- Add a post-experience feedback loop that refines the profile.
-- Vendor/partner network with reliability ratings.
+AI/ML robustness roadmap, drafted 2026-07-24. Ordered by value; Tier 1 is
+load-bearing, Tier 3 assumes the earlier tiers are in place.
+
+### Tier 1 — Robustness foundations
+1. **Preference Profile with continuous learning** — persist per-artist durable
+   facts (dietary, allergies, room prefs, vendor likes/dislikes) that the LLM
+   writes to after each interaction; separate durable facts from per-trip details.
+   The product's moat; everything else compounds on it.
+2. **Hallucination guard / link verification** — verify each returned URL resolves
+   and the hotel name appears on the page; drop or flag failures; attach a
+   confidence score per result. Biggest current reliability risk.
+3. **Structured, validated constraint extraction** — split extraction from search
+   into its own schema-validated call with per-field confidence; enables
+   clarifying questions and an eval set (paragraph → expected constraints).
+4. **Safety-critical allergy reasoning** — treat allergies as a stricter class than
+   preferences: never soft-match, never trade away, surface uncertainty explicitly
+   when a venue publishes no allergen policy.
+
+### Tier 2 — Intelligence
+5. **Learned ranking model** — rank results on constraint-match + price-fit +
+   vendor rating; start hand-tuned, graduate to a learned model once booking
+   volume exists.
+6. **Post-stay feedback loop** — 2–3 questions after each stay feeding both the
+   Preference Profile and vendor reliability scores.
+7. **RAG over a proprietary vendor knowledge base** — accumulate first-party
+   knowledge (who actually honored a dietary request, real venue distances) and
+   retrieve it alongside web results. Primary long-term defensibility.
+8. **Proactive anomaly & risk monitoring** — scheduled agent over the itinerary
+   flagging risks before they bite (late check-in after a moved flight, restaurant
+   closed on arrival night, venue-to-hotel distance blowout).
+
+### Tier 3 — Scale-up
+9. **Conversational multi-turn refinement with memory** — "cheaper", "closer to the
+   venue" refines the prior result set instead of restarting.
+10. **Multi-agent orchestration for full-trip planning** — specialist lodging /
+    dining / transport agents under a planner that owns the itinerary and resolves
+    inter-agent conflicts.
+
+### Sequencing note
+Start with 1 and 2; 3 makes both testable. Do not build the learned ranker (5)
+before booking data exists — a hand-tuned scoring formula will outperform an
+undertrained model on the first few hundred bookings.

@@ -40,3 +40,5 @@ _A cumulative log of corrections issued during development, with dates._
 | 2026-07-23 | In brainstorming phase: no code — suggestions/questions only. | Musician concierge platform discovery. |
 | 2026-07-24 | Build phase active — implement the requested website. | Natural-language hotel finder. |
 | 2026-07-24 | Use the Gemini API instead of Anthropic Claude. | LLM provider switch. |
+| 2026-07-24 | Gemini-backed app confirmed working with a live key. | End-to-end verification. |
+| 2026-07-24 | For roadmap/ideation requests: no code — deliver the list and reasoning only. | AI/ML robustness roadmap. |
