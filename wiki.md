@@ -24,16 +24,25 @@ The data model is a three-level hierarchy:
 ```
 Person (profile)
   ├── global constraints  (dietary, allergies, standing preferences, learned notes)
-  ├── tools{} × 10        (per-service preferences + learned notes — see tools.js)
+  │                       ← writable from ANY chat; applies everywhere
+  ├── tools{} × 12        (per-service preferences + learned notes — see tools.js)
   └── tours[]
-        └── threads{} keyed by tool
-              ├── messages[]    (conversation for this tour + this service)
-              ├── decisions[]   (locked in for this tour)
-              └── considered[]  (options seen, chosen/rejected)
+        ├── threads{} keyed by tool
+        │     ├── messages[]    (conversation for this tour + this service)
+        │     ├── decisions[]   (locked in for this tour)
+        │     └── considered[]  (options + stored summary, chosen/rejected)
+        └── itinerary          (master plan composed from every thread)
 ```
 
 Each `(tour, tool)` pair is an independent conversation. Hotel preferences never
-leak into transport, and one tour's decisions never leak into another's.
+leak into transport, and one tour's decisions never leak into another's — with two
+deliberate exceptions:
+
+1. **Personal facts are global.** Diet, allergies, and hard bodily constraints
+   mentioned in any service area are written to the profile rather than the tool.
+2. **The Tour Planner (`itinerary`, listed first) reads everything.** It is a
+   master tool: `getTourSummary()` collects every specialist thread's decisions and
+   chosen options, and the planner composes them into one day-by-day itinerary.
 
 Request flow:
 sidebar picks person + tour, tabs pick the service area → `POST /api/chat` with
@@ -92,15 +101,22 @@ _A detailed registry of what each file does and its exact location._
 _Specific anchors / line-number references linking documentation to exact lines of code._
 
 **`tools.js`**
-- `TOOLS` — the 10 service areas. `allergyRelevant` decides whether the strict
-  allergy verdict applies (true for hotel, dining, catering, grocery, medical).
+- `TOOLS` — 12 service areas. `itinerary` is first and carries `master: true`;
+  `allergyRelevant` decides whether the strict allergy verdict applies.
+- `specialistTools()` — everything except the master planner, i.e. what it reads.
 
 **`server.js`**
-- `SYSTEM_PROMPT` — memory rules, allergy safety rules, learning rules, and the
-  required JSON output shape (Gemini `systemInstruction`).
-- `buildContext()` — **the memory assembly.** Renders profile globals, that tool's
-  preferences, the tour's locked-in decisions, already-considered options with
-  status, and the last 12 conversation turns into the prompt preamble.
+- `SYSTEM_PROMPT` — memory rules, allergy safety rules, and the "personal facts are
+  always global" learning rule; the specialist JSON output shape.
+- `PLANNER_SYSTEM_PROMPT` — the master planner's contract: chronological segments
+  with time/type/provider/URL/carrying/status, a `logistics` block for items moving
+  between cities, and a `gaps` list.
+- `buildPlannerContext()` — assembles the cross-thread view (every specialist
+  area's decisions, chosen options, shortlist) plus the currently saved itinerary,
+  so the planner revises rather than restarts.
+- `buildContext()` — **the memory assembly** for specialist areas. Renders profile
+  globals, that tool's preferences, the tour's locked-in decisions,
+  already-considered options with status, and the last 12 conversation turns.
 - `enforceAllergySafety()` — **the safety boundary.** Rewrites any missing,
   invalid, or unevidenced verdict to `unverified`; returns `not_applicable` when
   no allergies are recorded or the tool isn't allergy-relevant.

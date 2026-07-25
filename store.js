@@ -15,7 +15,7 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
-import { TOOL_IDS } from "./tools.js";
+import { TOOL_IDS, specialistTools, getTool } from "./tools.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, "data");
@@ -54,7 +54,10 @@ function blankThread() {
   return {
     messages: [], // {role: "user"|"agent", text, at}
     decisions: [], // {at, text} — standing choices for this tour+tool
-    considered: [], // {at, name, url, status, reason} — options already seen
+    // Options already seen. Each carries the full summary the concierge wrote
+    // for it, so the sidebar can show why it was suggested without re-asking
+    // the model.
+    considered: [], // {at, name, url, status, reason, location, priceTier, notes, matches[], allergySafety}
   };
 }
 
@@ -66,6 +69,7 @@ function blankTour(name) {
     createdAt: now,
     updatedAt: now,
     threads: {}, // toolId -> thread, created lazily
+    itinerary: null, // last plan composed by the master Tour Planner
   };
 }
 
@@ -92,6 +96,7 @@ function normalizeProfile(p) {
       ...blankTour(t.name),
       ...t,
       threads: t.threads || {},
+      itinerary: t.itinerary || null,
     })),
   };
 }
@@ -324,9 +329,16 @@ export async function appendThreadTurn(profileId, tourId, toolId, turn = {}) {
       const key = opt.name.toLowerCase();
       const existing = thread.considered.find((c) => c.name.toLowerCase() === key);
       if (existing) {
-        // Update status if this turn changed it (e.g. considered -> rejected).
+        // Update status if this turn changed it (e.g. considered -> rejected),
+        // and fill in any summary detail we didn't have before. A later
+        // status-only update must not wipe the stored summary.
         if (opt.status) existing.status = opt.status;
         if (opt.reason) existing.reason = opt.reason;
+        for (const f of ["url", "location", "priceTier", "notes"]) {
+          if (opt[f]) existing[f] = opt[f];
+        }
+        if (opt.matches?.length) existing.matches = opt.matches;
+        if (opt.allergySafety) existing.allergySafety = opt.allergySafety;
         existing.at = now;
       } else {
         thread.considered.push({
@@ -335,6 +347,11 @@ export async function appendThreadTurn(profileId, tourId, toolId, turn = {}) {
           url: opt.url || "",
           status: opt.status || "considered",
           reason: opt.reason || "",
+          location: opt.location || "",
+          priceTier: opt.priceTier || "",
+          notes: opt.notes || "",
+          matches: opt.matches || [],
+          allergySafety: opt.allergySafety || null,
         });
       }
     }
@@ -351,6 +368,57 @@ export async function appendThreadTurn(profileId, tourId, toolId, turn = {}) {
 export async function setOptionStatus(profileId, tourId, toolId, name, status, reason = "") {
   return appendThreadTurn(profileId, tourId, toolId, {
     considered: [{ name, status, reason }],
+  });
+}
+
+/**
+ * Everything the master Tour Planner needs to compose one trip: what each
+ * specialist thread has locked in and which options were chosen there. This is
+ * what makes the planner a *combination* of the other chats rather than a
+ * twelfth independent conversation.
+ */
+export async function getTourSummary(profileId, tourId) {
+  const profile = await getProfile(profileId);
+  const tour = profile?.tours.find((t) => t.id === tourId);
+  if (!tour) return null;
+
+  const areas = [];
+  for (const tl of specialistTools()) {
+    const thread = tour.threads[tl.id];
+    if (!thread) continue;
+    const decisions = (thread.decisions || []).map((d) => d.text);
+    const chosen = (thread.considered || []).filter((c) => c.status === "chosen");
+    const shortlist = (thread.considered || []).filter((c) => c.status === "considered");
+    if (!decisions.length && !chosen.length && !shortlist.length) continue;
+    areas.push({
+      toolId: tl.id,
+      label: tl.label,
+      decisions,
+      chosen: chosen.map((c) => ({
+        name: c.name,
+        url: c.url,
+        location: c.location,
+        notes: c.notes,
+      })),
+      shortlist: shortlist.map((c) => ({ name: c.name, url: c.url, location: c.location })),
+    });
+  }
+
+  return { tourName: tour.name, areas, itinerary: tour.itinerary || null };
+}
+
+/** Persist the plan the master planner produced for this tour. */
+export async function saveItinerary(profileId, tourId, itinerary) {
+  return serialize(async () => {
+    const profiles = await readAll();
+    const pi = profiles.findIndex((p) => p.id === profileId);
+    if (pi === -1) return null;
+    const ti = profiles[pi].tours.findIndex((t) => t.id === tourId);
+    if (ti === -1) return null;
+    profiles[pi].tours[ti].itinerary = { ...itinerary, updatedAt: new Date().toISOString() };
+    profiles[pi].tours[ti].updatedAt = new Date().toISOString();
+    await writeAll(profiles);
+    return profiles[pi].tours[ti].itinerary;
   });
 }
 

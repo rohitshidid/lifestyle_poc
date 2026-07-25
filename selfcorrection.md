@@ -52,3 +52,6 @@ _A cumulative log of corrections issued during development, with dates._
 | 2026-07-25 | **UI quality matters — do not ship cramped layouts.** Long comma-separated values in single-line inputs overflow and look bad. Use chip/pill editors for list fields, give the layout room, and split CSS/JS out of the HTML. | UI rebuild. |
 | 2026-07-25 | Each person needs per-tool detail (10 service areas), not one flat preference set. | Data model. |
 | 2026-07-25 | Each tour must remember its own decisions per tool, so mid-conversation route changes carry prior context forward instead of restarting. | Tour memory. |
+| 2026-07-25 | Considered options must be clickable to re-read the summary generated for that place. | Sidebar UX. |
+| 2026-07-25 | **Personal/dietary facts stated in ANY chat must propagate to the person globally**, so they apply across every other chat. | Cross-cutting preferences. |
+| 2026-07-25 | Add a master "Tour Planner" as the FIRST tool — combines all other chats into one full itinerary with day-by-day flow, times, what is carried between places, and direct booking links. | Master itinerary. |

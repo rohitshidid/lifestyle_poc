@@ -100,7 +100,8 @@ function renderToolTabs() {
   for (const tl of TOOLS) {
     const hasActivity = !!t?.threads?.[tl.id]?.messages?.length;
     const b = document.createElement("button");
-    b.className = "tooltab" + (tl.id === activeToolId ? " active" : "");
+    b.className =
+      "tooltab" + (tl.master ? " master" : "") + (tl.id === activeToolId ? " active" : "");
     b.innerHTML = `<span>${tl.icon}</span><span>${esc(tl.label)}</span>${
       hasActivity ? '<span class="dot"></span>' : ""
     }`;
@@ -160,36 +161,199 @@ function renderMemory() {
         .join("")
     : '<div class="hint">Nothing locked in yet for this tour + service.</div>';
 
+  // Considered options are expandable: the summary written when the option was
+  // first suggested is stored with it, so it can be re-read without asking the
+  // model again.
   const con = activeThread.considered || [];
   $("considered").innerHTML = con.length
     ? con
-        .map(
-          (c) => `
-      <div class="considered-item">
-        <span class="nm" title="${esc(c.name)}">${esc(c.name)}</span>
-        <span class="row tight">
+        .map((c, i) => {
+          const s = c.allergySafety;
+          const safetyLabel = s
+            ? {
+                verified: "✓ Allergen policy found",
+                unverified: "⚠ Allergen info unverified",
+                risk: "✕ Possible allergen conflict",
+                not_applicable: "Allergy check n/a",
+              }[s.status] || s.status
+            : null;
+          return `
+      <div class="considered-item" data-idx="${i}">
+        <div class="ci-head" role="button" tabindex="0">
+          <span class="ci-caret">▸</span>
+          <span class="nm" title="${esc(c.name)}">${esc(c.name)}</span>
           <span class="status-badge ${esc(c.status)}">${esc(c.status)}</span>
+        </div>
+        <div class="ci-body hidden">
           ${
-            c.status !== "chosen"
-              ? `<button class="ghost xs" data-mark="chosen" data-name="${esc(c.name)}">Choose</button>`
+            c.location || c.priceTier
+              ? `<div class="ci-meta">${esc(c.location || "")}${
+                  c.priceTier ? ` · <span class="tier">${esc(c.priceTier)}</span>` : ""
+                }</div>`
               : ""
           }
+          ${c.notes ? `<p class="ci-notes">${esc(c.notes)}</p>` : ""}
           ${
-            c.status !== "rejected"
-              ? `<button class="ghost xs" data-mark="rejected" data-name="${esc(c.name)}">Reject</button>`
+            (c.matches || []).length
+              ? `<div class="chips">${c.matches
+                  .map((m) => `<span class="chip readonly">${esc(m)}</span>`)
+                  .join("")}</div>`
               : ""
           }
-        </span>
-      </div>`,
-        )
+          ${safetyLabel ? `<div class="safety ${esc(s.status)}">${safetyLabel}</div>` : ""}
+          ${s?.note ? `<div class="safety-note">${esc(s.note)}</div>` : ""}
+          ${c.reason ? `<div class="ci-reason">Reason: ${esc(c.reason)}</div>` : ""}
+          ${
+            !c.notes && !(c.matches || []).length && !c.location
+              ? '<div class="hint">No summary stored for this option.</div>'
+              : ""
+          }
+          <div class="row tight" style="margin-top:9px;">
+            ${
+              c.url
+                ? `<a class="ci-link" href="${esc(c.url)}" target="_blank" rel="noopener">Open ↗</a>`
+                : ""
+            }
+            ${
+              c.status !== "chosen"
+                ? `<button class="ghost xs" data-mark="chosen" data-name="${esc(c.name)}">Choose</button>`
+                : ""
+            }
+            ${
+              c.status !== "rejected"
+                ? `<button class="ghost xs" data-mark="rejected" data-name="${esc(c.name)}">Reject</button>`
+                : ""
+            }
+          </div>
+        </div>
+      </div>`;
+        })
         .join("")
     : '<div class="hint">No options considered yet.</div>';
 
   $("considered")
+    .querySelectorAll(".ci-head")
+    .forEach((head) => {
+      const toggle = () => {
+        const item = head.closest(".considered-item");
+        item.querySelector(".ci-body").classList.toggle("hidden");
+        head.querySelector(".ci-caret").textContent = item
+          .querySelector(".ci-body")
+          .classList.contains("hidden")
+          ? "▸"
+          : "▾";
+      };
+      head.onclick = toggle;
+      head.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          toggle();
+        }
+      };
+    });
+
+  $("considered")
     .querySelectorAll("button[data-mark]")
     .forEach((b) => {
-      b.onclick = () => markOption(b.dataset.name, b.dataset.mark);
+      b.onclick = (e) => {
+        e.stopPropagation();
+        markOption(b.dataset.name, b.dataset.mark);
+      };
     });
+}
+
+/* ============================================================= itinerary */
+
+function renderItinerary(it) {
+  const card = $("itineraryCard");
+  if (!it || !(it.days || []).length) {
+    if (!it?.gaps?.length && !it?.logistics?.length) {
+      card.classList.add("hidden");
+      return;
+    }
+  }
+  card.classList.remove("hidden");
+  $("itineraryTitle").textContent = it.title || "Tour itinerary";
+
+  const typeIcon = {
+    flights: "✈️", transport: "🚐", hotel: "🏨", dining: "🍽️", catering: "🥗",
+    courier: "📦", venue: "🎤", wellness: "🧘", medical: "⚕️", grocery: "🛒",
+    downtime: "🎧", other: "•",
+  };
+
+  $("itineraryDays").innerHTML = (it.days || [])
+    .map(
+      (d) => `
+    <div class="day">
+      <div class="day-head">
+        <span class="day-name">${esc(d.day)}</span>
+        ${d.city ? `<span class="day-city">${esc(d.city)}</span>` : ""}
+      </div>
+      ${(d.segments || [])
+        .map(
+          (s) => `
+        <div class="seg ${s.status === "booked" ? "booked" : ""}">
+          <div class="seg-time">${esc(s.time || "TBC")}</div>
+          <div class="seg-body">
+            <div class="seg-title">
+              <span class="seg-icon">${typeIcon[s.type] || "•"}</span>
+              ${
+                s.url
+                  ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a>`
+                  : esc(s.title)
+              }
+              <span class="status-badge ${s.status === "booked" ? "chosen" : ""}">${
+                s.status === "booked" ? "booked" : "to book"
+              }</span>
+            </div>
+            ${
+              s.location || s.provider
+                ? `<div class="seg-meta">${esc(s.location || "")}${
+                    s.provider ? ` · ${esc(s.provider)}` : ""
+                  }</div>`
+                : ""
+            }
+            ${s.carrying ? `<div class="seg-carry">📦 Carrying: ${esc(s.carrying)}</div>` : ""}
+            ${s.notes ? `<div class="seg-notes">${esc(s.notes)}</div>` : ""}
+          </div>
+        </div>`,
+        )
+        .join("")}
+    </div>`,
+    )
+    .join("");
+
+  const logi = it.logistics || [];
+  $("logisticsBlock").innerHTML = logi.length
+    ? `<h3 class="sub-head">📦 What moves between cities</h3>` +
+      logi
+        .map(
+          (l) => `
+      <div class="logi">
+        <div class="logi-item">${esc(l.item)}</div>
+        <div class="logi-route">${esc(l.from || "?")} → ${esc(l.to || "?")}</div>
+        <div class="logi-meta">
+          ${l.method ? `${esc(l.method)}` : ""}${l.provider ? ` · ${esc(l.provider)}` : ""}
+          ${l.collect ? ` · collect ${esc(l.collect)}` : ""}${
+            l.arrive ? ` · arrive ${esc(l.arrive)}` : ""
+          }
+        </div>
+        ${l.notes ? `<div class="seg-notes">${esc(l.notes)}</div>` : ""}
+        ${
+          l.url
+            ? `<a class="ci-link" href="${esc(l.url)}" target="_blank" rel="noopener">Book ↗</a>`
+            : ""
+        }
+      </div>`,
+        )
+        .join("")
+    : "";
+
+  const gaps = it.gaps || [];
+  $("gapsBlock").innerHTML = gaps.length
+    ? `<h3 class="sub-head">⚠ Still to sort</h3>` +
+      gaps.map((g) => `<div class="gap">${esc(g)}</div>`).join("")
+    : "";
 }
 
 function renderSidebar() {
@@ -283,11 +447,23 @@ async function loadProfiles() {
 
 async function loadThread() {
   activeThread = { messages: [], decisions: [], considered: [] };
+  $("itineraryCard").classList.add("hidden");
+  $("globalLearned").classList.add("hidden");
+
   if (activeProfileId && activeTourId && activeToolId) {
     const r = await fetch(
       `/api/profiles/${activeProfileId}/tours/${activeTourId}/threads/${activeToolId}`,
     );
     if (r.ok) activeThread = await r.json();
+
+    // On the master planner, show the tour's saved plan straight away.
+    if (activeToolId === "itinerary") {
+      const s = await fetch(`/api/profiles/${activeProfileId}/tours/${activeTourId}/itinerary`);
+      if (s.ok) {
+        const summary = await s.json();
+        if (summary.itinerary) renderItinerary(summary.itinerary);
+      }
+    }
   }
   renderAll();
 }
@@ -447,7 +623,9 @@ async function send() {
     if (!r.ok) throw new Error(data.error || "Request failed");
 
     if (data.thread) activeThread = data.thread;
+    if (data.itinerary) renderItinerary(data.itinerary);
     renderOptions(data);
+    renderGlobalLearned(data.globalLearned || []);
     $("status").textContent = "";
     await loadProfiles();
   } catch (e) {
@@ -456,6 +634,24 @@ async function send() {
   } finally {
     $("send").disabled = false;
   }
+}
+
+/**
+ * Surface anything that was written to the PERSON (not just this service area),
+ * so a dietary note dropped in the transport chat visibly lands everywhere.
+ */
+function renderGlobalLearned(items) {
+  const el = $("globalLearned");
+  if (!items.length) {
+    el.classList.add("hidden");
+    el.innerHTML = "";
+    return;
+  }
+  const icon = { dietary: "🥗", allergy: "⚠️", preference: "★", note: "✎" };
+  el.classList.remove("hidden");
+  el.innerHTML =
+    `<strong>Saved to ${esc(profile()?.name || "this person")} — applies in every chat:</strong> ` +
+    items.map((i) => `<span class="gl-chip">${icon[i.kind] || "•"} ${esc(i.text)}</span>`).join(" ");
 }
 
 function renderOptions(data) {

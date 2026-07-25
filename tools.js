@@ -1,13 +1,27 @@
-// The service categories the concierge covers. Each profile keeps its own
-// preferences per tool, and each tour keeps a separate conversation thread per
-// tool, so "where he sleeps" and "how he gets around" never bleed into each
-// other.
+// The service areas the concierge covers.
 //
-// `allergyRelevant` marks the tools where a food allergy can actually hurt
-// someone — those get the strict safety verdict treatment. The rest get
-// "not_applicable" so the UI isn't crying wolf on a car service.
+// `itinerary` is deliberately FIRST and is a different kind of tool: instead of
+// owning its own bookings, it reads every other thread on the tour and composes
+// the whole trip into one day-by-day plan. Everything below it is a specialist
+// area that feeds it.
+//
+// `allergyRelevant` marks the areas where a food allergy can actually hurt
+// someone — those get the strict safety verdict. The rest report
+// "not_applicable" so the warning still means something when it appears.
 
 export const TOOLS = [
+  {
+    id: "itinerary",
+    label: "Tour Planner",
+    icon: "🗺️",
+    master: true,
+    allergyRelevant: true,
+    blurb:
+      "The whole trip in one place — pulls together every other service area into a day-by-day plan with times, transfers, what's being carried, and booking links.",
+    placeholder:
+      "e.g. 14–17 May: Berlin (show on the 15th), then Munich 18–19. 5 people, 6 gear cases. Plan the whole thing — hotels, food, transfers, and shipping the cases between cities.",
+    prefHint: "always land a day early, no two-city days, buffer before soundcheck",
+  },
   {
     id: "hotel",
     label: "Hotels & Lodging",
@@ -37,13 +51,15 @@ export const TOOLS = [
     prefHint: "hot food at soundcheck, no nuts backstage",
   },
   {
-    id: "grocery",
-    label: "Groceries & Supplies",
-    icon: "🛒",
-    allergyRelevant: true,
-    blurb: "Bus stock, apartment groceries, and specialty dietary supplies.",
-    placeholder: "e.g. Stock the bus in Hamburg — oat milk, gluten-free bread.",
-    prefHint: "oat milk, sparkling water, specific brands",
+    id: "courier",
+    label: "Courier & Freight",
+    icon: "📦",
+    allergyRelevant: false,
+    blurb:
+      "Moving gear, merch, and instruments between cities — carriers, pickup windows, customs paperwork.",
+    placeholder:
+      "e.g. Ship 4 flight cases from the Berlin venue to Munich on the 16th, needs to arrive before load-in on the 18th.",
+    prefHint: "insured, tracked, door-to-door, no third-party handoffs",
   },
   {
     id: "transport",
@@ -91,6 +107,15 @@ export const TOOLS = [
     prefHint: "English-speaking clinic, 24h pharmacy",
   },
   {
+    id: "grocery",
+    label: "Groceries & Supplies",
+    icon: "🛒",
+    allergyRelevant: true,
+    blurb: "Bus stock, apartment groceries, and specialty dietary supplies.",
+    placeholder: "e.g. Stock the bus in Hamburg — oat milk, gluten-free bread.",
+    prefHint: "oat milk, sparkling water, specific brands",
+  },
+  {
     id: "downtime",
     label: "Downtime & Activities",
     icon: "🎧",
@@ -102,7 +127,13 @@ export const TOOLS = [
 ];
 
 export const TOOL_IDS = TOOLS.map((t) => t.id);
+export const MASTER_TOOL_ID = "itinerary";
 
 export function getTool(id) {
   return TOOLS.find((t) => t.id === id) || null;
+}
+
+/** Every specialist area — i.e. everything the master planner draws from. */
+export function specialistTools() {
+  return TOOLS.filter((t) => !t.master);
 }

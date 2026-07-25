@@ -56,18 +56,30 @@ The core model everything hangs off:
 ```
 Person (profile)
   ├── global constraints  (dietary, allergies, standing preferences, learned notes)
-  ├── tools{} × 10        (per-service preferences + learned notes)
+  │                       ← ANY chat can write here; applies everywhere
+  ├── tools{} × 12        (per-service preferences + learned notes)
   └── tours[]
-        └── threads{} keyed by tool
-              ├── messages[]    (the conversation for this tour + this service)
-              ├── decisions[]   (what is locked in for this tour)
-              └── considered[]  (options seen, with chosen/rejected status)
+        ├── threads{} keyed by tool
+        │     ├── messages[]    (the conversation for this tour + this service)
+        │     ├── decisions[]   (what is locked in for this tour)
+        │     └── considered[]  (options + their full stored summary, status)
+        └── itinerary          (the master plan composed from every thread)
 ```
 
 Each `(tour, tool)` pair is an independent thread. A route change mid-conversation
 re-enters the same thread with prior decisions, rejected options, and the running
 conversation already in context, so the concierge carries forward what is still
 valid instead of restarting.
+
+**Two cross-cutting rules:**
+- **Personal facts are global.** Dietary requirements, allergies, and hard bodily
+  constraints mentioned in *any* service area are written to the profile, not the
+  tool — so a dairy-free mention in the transport chat reaches the dining chat.
+  Tool-scoped facts (habits about that service) stay on the tool.
+- **The Tour Planner (`itinerary`) is a master tool**, listed first. It does not
+  own bookings; it reads every specialist thread's decisions and chosen options
+  and composes one day-by-day plan with times, transfers, what is being carried
+  between cities, and booking links.
 
 ## Micro-tasks
 _A granular checklist of the immediate next steps needed to complete the current task._
@@ -103,7 +115,22 @@ _A granular checklist of the immediate next steps needed to complete the current
 - [x] **UI rebuild** (2026-07-25) — chip editors replace the overflowing
       comma-separated inputs; tool tabs, sticky sidebar, collapsible sections,
       split `styles.css` / `app.js`
-- [ ] Handle remaining edge cases (no location given, no results, search rate limits)
+- [x] **Master Tour Planner + cross-cutting memory** (2026-07-25)
+  - [x] `itinerary` master tool listed first; `courier` service added (12 total)
+  - [x] `getTourSummary()` aggregates every specialist thread's decisions and
+        chosen options; planner prompt composes them into one plan
+  - [x] Itinerary output: day-by-day segments with time, type, provider, booking
+        URL, what is being carried, and booked/to-book status; plus a logistics
+        block for items moving between cities and a gaps list
+  - [x] Itinerary persisted on the tour and reloaded when the planner tab opens
+  - [x] Considered options store their full summary; sidebar entries expand to
+        show it (verified a status-only change does not wipe the summary)
+  - [x] Personal facts (diet/allergy/body) forced global from any chat — verified
+        a dietary + allergy mention in the transport chat lands on the profile
+  - [x] `globalLearned` banner shows what was written to the person
+- [ ] Confirm with user: what "when it will come and how it will come" refers to
+      (assumed: per-segment arrival time + mode for transfers/deliveries)
+- [ ] Handle remaining edge cases (no dates given, no results, search rate limits)
 - [ ] Next recommended: roadmap #2 (link verification) and #3 (structured extraction)
 
 ## Upcoming Goals

@@ -15,17 +15,34 @@ requirements.
 
 ```
 Person (profile)
-  ├── global constraints  (dietary, allergies, standing preferences, learned notes)
-  ├── tools × 10          (per-service preferences — hotel prefs ≠ transport prefs)
+  ├── global constraints  (dietary, allergies, standing preferences)
+  ├── tools × 12          (per-service preferences — hotel prefs ≠ transport prefs)
   └── tours
-        └── one conversation thread per service area, each remembering
-            its own messages, locked-in decisions, and considered options
+        ├── one conversation thread per service area
+        └── one master itinerary composed from all of them
 ```
 
 Pick a **person** and a **tour** in the sidebar, pick a **service area** from the
-tabs, and talk. The 10 service areas are hotels, dining, backstage catering,
-groceries, ground transport, flights, venue logistics, wellness, medical, and
-downtime.
+tabs, and talk. Alongside the master **Tour Planner** the service areas are hotels,
+dining, backstage catering, courier & freight, ground transport, flights, venue
+logistics, wellness, medical, groceries, and downtime.
+
+## Tour Planner (the first tab)
+
+The Tour Planner doesn't book one thing — it plans the whole trip. Give it the
+shape of the tour ("14–17 May Berlin, show on the 15th, then Munich 18–19, 5 people
+and 6 gear cases") and it composes a **day-by-day itinerary**, pulling in whatever
+the specialist chats have already locked in.
+
+Each day is a timeline of segments with a **time**, what happens, where, the
+provider, **a direct booking link**, and whether it's already booked or still to
+book. Anything physically moving between cities — gear, merch, instruments — is
+tracked separately with its carrier, collection window, and required arrival time,
+so shipping that lands after load-in gets flagged. Anything still unresolved shows
+up in a "still to sort" list.
+
+Because it reads the other threads, a hotel you chose in the hotels chat shows up
+as an already-booked segment rather than a fresh suggestion.
 
 ## Tour memory
 
@@ -40,13 +57,21 @@ everything still valid forward instead of starting over. Superseded decisions ar
 called out in the UI.
 
 Mark any option **Choose** or **Reject** and that status feeds the next message.
+Every considered option in the sidebar is **clickable** — expand it to re-read the
+summary written when it was suggested, along with its location, price tier,
+allergy verdict, and link.
 
 ## Continuous learning
 
 After each exchange the system extracts **durable** facts and files them in the
-right place — profile-wide ("travels with a 4-person crew") vs service-specific
-("prefers boutique over chain hotels", stored on hotels only). Trip-specific
-details stay out of the profile and live as tour decisions instead.
+right place — profile-wide vs service-specific ("prefers boutique over chain
+hotels", stored on hotels only). Trip-specific details stay out of the profile and
+live as tour decisions instead.
+
+**Personal facts are global, wherever you mention them.** Say "I've gone dairy-free"
+while booking a van and it lands on the person, not on transport — so the dining and
+catering chats pick it up too. Same for allergies and hard bodily constraints. A
+banner confirms what was written to the person.
 
 Learning is **additive only**: it can add or escalate a constraint, never delete one.
 
