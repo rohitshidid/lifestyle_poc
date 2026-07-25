@@ -14,6 +14,8 @@
       --muted: #9aa2b1;
       --accent: #e0a458;
       --accent-2: #6fb1a0;
+      --danger: #d9705f;
+      --warn: #d8b25c;
     }
     * { box-sizing: border-box; }
     body {
@@ -23,125 +25,350 @@
       color: var(--text);
       line-height: 1.5;
     }
-    header {
-      padding: 32px 24px 8px;
-      max-width: 900px;
-      margin: 0 auto;
-    }
+    header { padding: 28px 24px 4px; max-width: 1240px; margin: 0 auto; }
     header h1 { margin: 0 0 4px; font-size: 1.6rem; }
     header p { margin: 0; color: var(--muted); }
-    main { max-width: 900px; margin: 0 auto; padding: 16px 24px 64px; }
-    section {
+
+    .layout {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 12px 24px 64px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: minmax(0, 1fr); }
+      aside { order: -1; }
+    }
+
+    section, aside .card {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 12px;
-      padding: 20px;
-      margin-top: 20px;
+      padding: 18px;
+      margin-top: 16px;
     }
-    section h2 { margin: 0 0 12px; font-size: 1.05rem; }
-    textarea {
+    section h2, aside h2 { margin: 0 0 12px; font-size: 1.02rem; }
+
+    textarea, input[type="text"] {
       width: 100%;
-      min-height: 130px;
-      resize: vertical;
       background: var(--panel-2);
       color: var(--text);
       border: 1px solid var(--line);
       border-radius: 10px;
-      padding: 14px;
+      padding: 12px;
       font: inherit;
     }
-    .row { display: flex; gap: 12px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+    textarea { min-height: 130px; resize: vertical; }
+    .row { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
     button {
-      background: var(--accent);
-      color: #201502;
-      border: none;
-      border-radius: 10px;
-      padding: 12px 20px;
-      font-weight: 600;
-      font-size: 0.95rem;
-      cursor: pointer;
+      background: var(--accent); color: #201502; border: none; border-radius: 10px;
+      padding: 11px 18px; font-weight: 600; font-size: 0.92rem; cursor: pointer;
     }
-    button:disabled { opacity: 0.6; cursor: default; }
+    button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+    button.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+    button.tiny { padding: 6px 12px; font-size: 0.8rem; }
+    button:disabled { opacity: 0.55; cursor: default; }
+
     .hint { color: var(--muted); font-size: 0.85rem; }
-    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 7px; }
     .chip {
-      background: var(--panel-2);
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 4px 12px;
-      font-size: 0.82rem;
+      background: var(--panel-2); border: 1px solid var(--line);
+      border-radius: 999px; padding: 4px 11px; font-size: 0.8rem;
     }
     .chip.diet { border-color: var(--accent-2); color: var(--accent-2); }
-    .chip.allergy { border-color: #d9705f; color: #d9705f; }
-    .field-label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; margin: 12px 0 6px; }
-    .hotel {
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 16px;
-      margin-top: 12px;
-      background: var(--panel-2);
+    .chip.allergy { border-color: var(--danger); color: var(--danger); }
+    .field-label {
+      color: var(--muted); font-size: 0.75rem; text-transform: uppercase;
+      letter-spacing: 0.05em; margin: 14px 0 6px;
     }
-    .hotel h3 { margin: 0 0 4px; font-size: 1.05rem; }
+    .hidden { display: none; }
+    .error { color: var(--danger); }
+
+    /* Allergy safety */
+    .safety-banner {
+      border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;
+      border: 1px solid var(--danger); background: rgba(217,112,95,0.08);
+      font-size: 0.9rem;
+    }
+    .safety {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 0.78rem; padding: 3px 10px; border-radius: 6px;
+      border: 1px solid var(--line); margin-top: 8px;
+    }
+    .safety.verified { border-color: var(--accent-2); color: var(--accent-2); }
+    .safety.unverified { border-color: var(--warn); color: var(--warn); }
+    .safety.risk { border-color: var(--danger); color: var(--danger); background: rgba(217,112,95,0.1); }
+    .safety.not_applicable { color: var(--muted); }
+    .safety-note { color: var(--muted); font-size: 0.82rem; margin-top: 5px; }
+
+    /* Hotels */
+    .hotel {
+      border: 1px solid var(--line); border-radius: 10px; padding: 15px;
+      margin-top: 12px; background: var(--panel-2);
+    }
+    .hotel.risk { border-color: var(--danger); }
+    .hotel h3 { margin: 0 0 4px; font-size: 1.03rem; }
     .hotel a { color: var(--accent); text-decoration: none; }
     .hotel a:hover { text-decoration: underline; }
-    .hotel .meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 8px; }
+    .hotel .meta { color: var(--muted); font-size: 0.84rem; margin-bottom: 8px; }
     .hotel .notes { margin: 8px 0 0; }
-    .hidden { display: none; }
-    .spinner { color: var(--muted); }
-    .error { color: #d9705f; }
-    .tier { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 8px; border-radius: 6px; background: var(--panel); border: 1px solid var(--line); }
+    .tier {
+      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
+      padding: 2px 8px; border-radius: 6px; background: var(--panel); border: 1px solid var(--line);
+    }
+
+    /* Profile sidebar */
+    aside .card { margin-top: 0; }
+    .profile-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .profile-item {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      background: var(--panel-2); border: 1px solid var(--line);
+      border-radius: 9px; padding: 9px 12px; cursor: pointer; font-size: 0.9rem;
+    }
+    .profile-item:hover { border-color: var(--muted); }
+    .profile-item.active { border-color: var(--accent); color: var(--accent); }
+    .profile-item .when { color: var(--muted); font-size: 0.74rem; }
+    .editor { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
+    .editor input[type="text"] { margin-bottom: 8px; font-size: 0.88rem; }
+    .editor .field-label { margin-top: 10px; }
+    .note-list { margin: 0; padding-left: 18px; color: var(--muted); font-size: 0.85rem; }
+    .learned {
+      border-left: 2px solid var(--accent-2); padding-left: 10px;
+      margin-top: 10px; font-size: 0.85rem; color: var(--accent-2);
+    }
   </style>
 </head>
 <body>
   <header>
     <h1>🎧 IHMS Concierge</h1>
-    <p>Describe your trip and constraints in plain language. We extract your needs and find hotels that fit.</p>
+    <p>Describe your trip in plain language. We combine it with the artist's stored profile and find hotels that fit.</p>
   </header>
 
-  <main>
-    <section>
-      <h2>Tell us what you need</h2>
-      <textarea id="request" placeholder="e.g. I'm playing two shows in Berlin next month. I'm vegan and severely allergic to tree nuts. I want a quiet room away from the elevator, a hotel with a gym, ideally walking distance to Mitte, mid-range budget."></textarea>
-      <div class="row">
-        <button id="go">Find hotels</button>
-        <span class="hint">Powered by Gemini with live Google Search.</span>
+  <div class="layout">
+    <!-- ============ MAIN ============ -->
+    <main>
+      <section>
+        <h2>Tell us what you need</h2>
+        <div id="activeProfileBar" class="hint" style="margin-bottom:10px;">No profile selected — searching without stored preferences.</div>
+        <textarea id="request" placeholder="e.g. I'm playing two shows in Berlin next month. I want a quiet room away from the elevator, a hotel with a gym, ideally walking distance to Mitte, mid-range budget."></textarea>
+        <div class="row">
+          <button id="go">Find hotels</button>
+          <span class="hint">Powered by Gemini with live Google Search.</span>
+        </div>
+      </section>
+
+      <section id="status" class="hidden">
+        <span id="statusText">Searching…</span>
+      </section>
+
+      <section id="parsed" class="hidden">
+        <h2>What we understood</h2>
+        <div class="field-label">Location</div>
+        <div id="loc"></div>
+        <div class="field-label">Dietary</div>
+        <div id="diet" class="chips"></div>
+        <div class="field-label">Allergies (safety-critical)</div>
+        <div id="allergy" class="chips"></div>
+        <div class="field-label">Other preferences</div>
+        <div id="prefs" class="chips"></div>
+        <div id="learnedBox" class="learned hidden"></div>
+      </section>
+
+      <section id="results" class="hidden">
+        <h2>Matching hotels</h2>
+        <div id="safetyBanner"></div>
+        <div id="hotels"></div>
+      </section>
+    </main>
+
+    <!-- ============ PROFILE SIDEBAR ============ -->
+    <aside>
+      <div class="card">
+        <h2>Preference profiles</h2>
+        <div id="profileList" class="profile-list"></div>
+        <div class="row" style="margin-top:0;">
+          <input type="text" id="newProfileName" placeholder="New profile name…" />
+        </div>
+        <div class="row">
+          <button id="createProfile" class="tiny">+ Create profile</button>
+          <button id="clearProfile" class="secondary tiny">Use none</button>
+        </div>
+
+        <div id="editor" class="editor hidden">
+          <div class="field-label">Profile name</div>
+          <input type="text" id="pName" />
+
+          <div class="field-label">Dietary (comma-separated)</div>
+          <input type="text" id="pDiet" placeholder="vegan, gluten-free" />
+
+          <div class="field-label">Allergies — use name:severity</div>
+          <input type="text" id="pAllergy" placeholder="tree nuts:severe, shellfish:mild" />
+          <div class="hint" style="font-size:0.78rem;margin-top:4px;">Severity: severe / moderate / mild. Never downgraded automatically.</div>
+
+          <div class="field-label">Other preferences</div>
+          <input type="text" id="pPrefs" placeholder="quiet room, gym, high floor" />
+
+          <div class="field-label">Learned notes</div>
+          <ul id="pNotes" class="note-list"></ul>
+
+          <div class="field-label">Recent trips</div>
+          <ul id="pHistory" class="note-list"></ul>
+
+          <div class="row">
+            <button id="saveProfile" class="tiny">Save</button>
+            <button id="deleteProfile" class="danger tiny">Delete</button>
+          </div>
+          <div id="saveMsg" class="hint" style="margin-top:6px;"></div>
+        </div>
       </div>
-    </section>
-
-    <section id="status" class="hidden">
-      <span id="statusText" class="spinner">Searching…</span>
-    </section>
-
-    <section id="parsed" class="hidden">
-      <h2>What we understood</h2>
-      <div class="field-label">Location</div>
-      <div id="loc"></div>
-      <div class="field-label">Dietary</div>
-      <div id="diet" class="chips"></div>
-      <div class="field-label">Allergies</div>
-      <div id="allergy" class="chips"></div>
-      <div class="field-label">Other preferences</div>
-      <div id="prefs" class="chips"></div>
-    </section>
-
-    <section id="results" class="hidden">
-      <h2>Matching hotels</h2>
-      <div id="hotels"></div>
-    </section>
-  </main>
+    </aside>
+  </div>
 
   <script>
     const $ = (id) => document.getElementById(id);
-    const chips = (el, items, cls = "") => {
+    let profiles = [];
+    let activeId = localStorage.getItem("ihms.activeProfile") || null;
+
+    const splitList = (s) => s.split(",").map((x) => x.trim()).filter(Boolean);
+    const parseAllergyInput = (s) =>
+      splitList(s).map((item) => {
+        const [name, severity] = item.split(":").map((x) => (x || "").trim());
+        return { name, severity: severity || "unknown" };
+      }).filter((a) => a.name);
+
+    function chips(el, items, cls = "") {
       el.innerHTML = "";
       if (!items || !items.length) { el.innerHTML = '<span class="hint">None specified</span>'; return; }
       for (const it of items) {
         const s = document.createElement("span");
         s.className = "chip " + cls;
-        s.textContent = it;
+        s.textContent = typeof it === "string" ? it : `${it.name} (${it.severity})`;
         el.appendChild(s);
       }
+    }
+
+    // ---------------- Profiles ----------------
+
+    async function loadProfiles() {
+      profiles = await (await fetch("/api/profiles")).json();
+      renderProfileList();
+      renderEditor();
+      renderActiveBar();
+    }
+
+    function renderProfileList() {
+      const list = $("profileList");
+      list.innerHTML = "";
+      if (!profiles.length) {
+        list.innerHTML = '<span class="hint">No profiles yet. Create one below.</span>';
+        return;
+      }
+      for (const p of profiles) {
+        const div = document.createElement("div");
+        div.className = "profile-item" + (p.id === activeId ? " active" : "");
+        const when = new Date(p.updatedAt).toLocaleDateString();
+        div.innerHTML = `<span>${p.name}</span><span class="when">${when}</span>`;
+        div.onclick = () => selectProfile(p.id);
+        list.appendChild(div);
+      }
+    }
+
+    function activeProfile() {
+      return profiles.find((p) => p.id === activeId) || null;
+    }
+
+    function renderActiveBar() {
+      const p = activeProfile();
+      const bar = $("activeProfileBar");
+      if (!p) {
+        bar.textContent = "No profile selected — searching without stored preferences.";
+        bar.className = "hint";
+        return;
+      }
+      const allergies = (p.allergies || []).map((a) => `${a.name} (${a.severity})`).join(", ");
+      bar.innerHTML = `Searching as <strong>${p.name}</strong>` +
+        (allergies ? ` · <span style="color:var(--danger)">allergies: ${allergies}</span>` : "");
+      bar.className = "hint";
+    }
+
+    function renderEditor() {
+      const p = activeProfile();
+      if (!p) { $("editor").classList.add("hidden"); return; }
+      $("editor").classList.remove("hidden");
+      $("pName").value = p.name;
+      $("pDiet").value = (p.dietary || []).join(", ");
+      $("pAllergy").value = (p.allergies || []).map((a) => `${a.name}:${a.severity}`).join(", ");
+      $("pPrefs").value = (p.otherPreferences || []).join(", ");
+
+      $("pNotes").innerHTML = (p.notes || []).length
+        ? p.notes.map((n) => `<li>${n}</li>`).join("")
+        : '<li class="hint">Nothing learned yet — run a search.</li>';
+
+      $("pHistory").innerHTML = (p.history || []).length
+        ? p.history.slice(0, 5).map((h) =>
+            `<li>${h.location || "—"} · ${new Date(h.at).toLocaleDateString()}</li>`).join("")
+        : '<li class="hint">No trips yet.</li>';
+    }
+
+    function selectProfile(id) {
+      activeId = id;
+      localStorage.setItem("ihms.activeProfile", id);
+      renderProfileList(); renderEditor(); renderActiveBar();
+    }
+
+    $("createProfile").onclick = async () => {
+      const name = $("newProfileName").value.trim();
+      if (!name) { $("newProfileName").focus(); return; }
+      const r = await fetch("/api/profiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const p = await r.json();
+      $("newProfileName").value = "";
+      await loadProfiles();
+      selectProfile(p.id);
     };
+
+    $("clearProfile").onclick = () => {
+      activeId = null;
+      localStorage.removeItem("ihms.activeProfile");
+      renderProfileList(); renderEditor(); renderActiveBar();
+    };
+
+    $("saveProfile").onclick = async () => {
+      const p = activeProfile();
+      if (!p) return;
+      const body = {
+        name: $("pName").value,
+        dietary: splitList($("pDiet").value),
+        allergies: parseAllergyInput($("pAllergy").value),
+        otherPreferences: splitList($("pPrefs").value),
+        notes: p.notes || [],
+      };
+      await fetch(`/api/profiles/${p.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      $("saveMsg").textContent = "Saved.";
+      setTimeout(() => ($("saveMsg").textContent = ""), 2000);
+      await loadProfiles();
+    };
+
+    $("deleteProfile").onclick = async () => {
+      const p = activeProfile();
+      if (!p || !confirm(`Delete profile "${p.name}"? This cannot be undone.`)) return;
+      await fetch(`/api/profiles/${p.id}`, { method: "DELETE" });
+      activeId = null;
+      localStorage.removeItem("ihms.activeProfile");
+      await loadProfiles();
+    };
+
+    // ---------------- Search ----------------
 
     async function search() {
       const request = $("request").value.trim();
@@ -149,7 +376,7 @@
 
       $("go").disabled = true;
       $("status").classList.remove("hidden");
-      $("statusText").className = "spinner";
+      $("statusText").className = "";
       $("statusText").textContent = "Reading your request and searching hotels… this can take 20–40s.";
       $("parsed").classList.add("hidden");
       $("results").classList.add("hidden");
@@ -158,20 +385,46 @@
         const r = await fetch("/api/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ request }),
+          body: JSON.stringify({ request, profileId: activeId }),
         });
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || "Request failed");
 
-        // Parsed constraints
         const p = data.parsed || {};
         $("loc").textContent = p.location || "Not detected — please mention a city.";
         chips($("diet"), p.dietary, "diet");
-        chips($("allergy"), p.allergies, "allergy");
+        chips($("allergy"), (data.allergyWatch?.active?.length ? data.allergyWatch.active : p.allergies), "allergy");
         chips($("prefs"), p.otherPreferences);
+
+        // What the system learned this round
+        const u = data.profileUpdates || {};
+        const learned = [
+          ...(u.dietary || []),
+          ...(u.allergies || []).map((a) => `${a.name} (${a.severity})`),
+          ...(u.otherPreferences || []),
+          ...(u.notes || []),
+        ];
+        if (data.profile && learned.length) {
+          $("learnedBox").classList.remove("hidden");
+          $("learnedBox").innerHTML = `<strong>Learned & saved to “${data.profile.name}”:</strong> ${learned.join(" · ")}`;
+        } else {
+          $("learnedBox").classList.add("hidden");
+        }
         $("parsed").classList.remove("hidden");
 
-        // Hotels
+        // Allergy safety banner
+        const watch = data.allergyWatch || {};
+        const banner = $("safetyBanner");
+        if (watch.active?.length) {
+          const severe = watch.severe?.length ? ` Severe: <strong>${watch.severe.join(", ")}</strong>.` : "";
+          banner.innerHTML = `<div class="safety-banner">⚠️ Allergy check active for
+            <strong>${watch.active.map((a) => a.name).join(", ")}</strong>.${severe}
+            ${watch.unverifiedCount} of ${(data.hotels || []).length} results have no published allergen
+            information — confirm directly with the property before booking.</div>`;
+        } else {
+          banner.innerHTML = "";
+        }
+
         const wrap = $("hotels");
         wrap.innerHTML = "";
         const hotels = data.hotels || [];
@@ -179,13 +432,22 @@
           wrap.innerHTML = '<p class="hint">No matching hotels found. Try adding a city or loosening a constraint.</p>';
         } else {
           for (const h of hotels) {
+            const s = h.allergySafety || { status: "not_applicable", note: "" };
+            const label = {
+              verified: "✓ Allergen policy found",
+              unverified: "⚠ Allergen info unverified",
+              risk: "✕ Possible allergen conflict",
+              not_applicable: "No allergies on record",
+            }[s.status] || s.status;
+
             const div = document.createElement("div");
-            div.className = "hotel";
-            const matches = (h.matches || []).map((m) => `<span class="chip">${m}</span>`).join(" ");
+            div.className = "hotel" + (s.status === "risk" ? " risk" : "");
             div.innerHTML = `
               <h3>${h.url ? `<a href="${h.url}" target="_blank" rel="noopener">${h.name}</a>` : h.name}</h3>
               <div class="meta">${h.location || ""} ${h.priceTier ? `· <span class="tier">${h.priceTier}</span>` : ""}</div>
-              <div class="chips">${matches}</div>
+              <div class="chips">${(h.matches || []).map((m) => `<span class="chip">${m}</span>`).join(" ")}</div>
+              <div><span class="safety ${s.status}">${label}</span></div>
+              ${s.note ? `<div class="safety-note">${s.note}</div>` : ""}
               ${h.notes ? `<p class="notes">${h.notes}</p>` : ""}
             `;
             wrap.appendChild(div);
@@ -193,6 +455,8 @@
         }
         $("results").classList.remove("hidden");
         $("status").classList.add("hidden");
+
+        if (data.profile) await loadProfiles();
       } catch (e) {
         $("statusText").className = "error";
         $("statusText").textContent = "Error: " + e.message;
@@ -202,6 +466,7 @@
     }
 
     $("go").addEventListener("click", search);
+    loadProfiles();
   </script>
 </body>
 </html>

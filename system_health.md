@@ -31,6 +31,12 @@ _Core architectural rules, tech stack constraints, and absolute boundaries._
   `@google/genai` SDK. Hotel links come from the `googleSearch` grounding tool —
   never fabricate links.
 - Secrets (`GEMINI_API_KEY`) live only in `.env` (gitignored), never committed.
+- **Allergy safety is a hard boundary, not a prompt suggestion.** Allergy severity
+  may only ever escalate on merge (`store.js`), and no hotel may reach the user
+  without an explicit verdict — any missing, malformed, or evidence-free "safe"
+  claim is forced to `unverified` server-side (`server.js` → `enforceAllergySafety`).
+- Continuous learning is **additive only** — it never deletes a stored constraint,
+  because one ambiguous sentence must not be able to erase a standing allergy.
 
 ## Active Rules
 _Current development guidelines in effect._
@@ -41,8 +47,8 @@ _Current development guidelines in effect._
 ## Current Tasks
 _The macro-level task currently being worked on._
 
-- Build and iterate on the natural-language hotel finder (paragraph in → parsed
-  constraints + matching hotel links out).
+- Tier 1 hardening: Preference Profiles with continuous learning (#1) and
+  safety-critical allergy reasoning (#4) — both implemented.
 
 ## Micro-tasks
 _A granular checklist of the immediate next steps needed to complete the current task._
@@ -54,8 +60,19 @@ _A granular checklist of the immediate next steps needed to complete the current
 - [x] Switch LLM provider from Anthropic Claude to Google Gemini (per user request)
 - [x] End-to-end test with a real `GEMINI_API_KEY` — confirmed working by user 2026-07-24
 - [x] Draft AI/ML robustness roadmap (see Upcoming Goals)
-- [ ] Decide which roadmap item to build next (recommended: Preference Profile)
-- [ ] Handle edge cases (no location given, no results, search rate limits)
+- [x] **Roadmap #1 — Preference Profiles with continuous learning**
+  - [x] `store.js` JSON-backed profile store with serialized writes
+  - [x] Profile CRUD endpoints (`/api/profiles`)
+  - [x] Right-side sidebar: create / select / edit / delete profiles
+  - [x] Search merges the active profile's constraints into the prompt
+  - [x] Post-search learning merge writes durable facts back to the profile
+  - [x] Trip history logged per profile
+- [x] **Roadmap #4 — Safety-critical allergy reasoning**
+  - [x] Allergies stored with severity; escalation-only merge (verified by test)
+  - [x] Server-side `enforceAllergySafety` guard (verified against 5 failure modes)
+  - [x] Per-hotel verdict UI + severe-allergy warning banner
+- [ ] Handle remaining edge cases (no location given, no results, search rate limits)
+- [ ] Next recommended: roadmap #2 (link verification) and #3 (structured extraction)
 
 ## Upcoming Goals
 _The roadmap of future features or refactoring._
@@ -64,19 +81,18 @@ AI/ML robustness roadmap, drafted 2026-07-24. Ordered by value; Tier 1 is
 load-bearing, Tier 3 assumes the earlier tiers are in place.
 
 ### Tier 1 — Robustness foundations
-1. **Preference Profile with continuous learning** — persist per-artist durable
-   facts (dietary, allergies, room prefs, vendor likes/dislikes) that the LLM
-   writes to after each interaction; separate durable facts from per-trip details.
-   The product's moat; everything else compounds on it.
+1. ~~**Preference Profile with continuous learning**~~ — ✅ **DONE 2026-07-25.**
+   `store.js` + `/api/profiles` + right-side sidebar; search merges the active
+   profile and folds durable facts back in after each run.
 2. **Hallucination guard / link verification** — verify each returned URL resolves
    and the hotel name appears on the page; drop or flag failures; attach a
    confidence score per result. Biggest current reliability risk.
 3. **Structured, validated constraint extraction** — split extraction from search
    into its own schema-validated call with per-field confidence; enables
    clarifying questions and an eval set (paragraph → expected constraints).
-4. **Safety-critical allergy reasoning** — treat allergies as a stricter class than
-   preferences: never soft-match, never trade away, surface uncertainty explicitly
-   when a venue publishes no allergen policy.
+4. ~~**Safety-critical allergy reasoning**~~ — ✅ **DONE 2026-07-25.** Severity-ranked
+   allergies, escalation-only merge, and a server-side verdict guard that downgrades
+   any evidence-free "safe" claim to `unverified`.
 
 ### Tier 2 — Intelligence
 5. **Learned ranking model** — rank results on constraint-match + price-fit +

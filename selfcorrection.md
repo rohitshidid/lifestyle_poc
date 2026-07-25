@@ -42,3 +42,5 @@ _A cumulative log of corrections issued during development, with dates._
 | 2026-07-24 | Use the Gemini API instead of Anthropic Claude. | LLM provider switch. |
 | 2026-07-24 | Gemini-backed app confirmed working with a live key. | End-to-end verification. |
 | 2026-07-24 | For roadmap/ideation requests: no code — deliver the list and reasoning only. | AI/ML robustness roadmap. |
+| 2026-07-25 | Build roadmap #1 (Preference Profiles + continuous learning) with a right-side create/navigate panel, and roadmap #4 (allergy safety). | Tier 1 hardening. |
+| 2026-07-25 | Profile details are per-profile and persistent; profile management belongs in a right-hand sidebar. | UI placement preference. |
