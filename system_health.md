@@ -47,8 +47,27 @@ _Current development guidelines in effect._
 ## Current Tasks
 _The macro-level task currently being worked on._
 
-- Tier 1 hardening: Preference Profiles with continuous learning (#1) and
-  safety-critical allergy reasoning (#4) — both implemented.
+- Per-person × per-tool × per-tour architecture with conversational memory,
+  plus a rebuilt UI. Implemented 2026-07-25.
+
+## Data Hierarchy
+The core model everything hangs off:
+
+```
+Person (profile)
+  ├── global constraints  (dietary, allergies, standing preferences, learned notes)
+  ├── tools{} × 10        (per-service preferences + learned notes)
+  └── tours[]
+        └── threads{} keyed by tool
+              ├── messages[]    (the conversation for this tour + this service)
+              ├── decisions[]   (what is locked in for this tour)
+              └── considered[]  (options seen, with chosen/rejected status)
+```
+
+Each `(tour, tool)` pair is an independent thread. A route change mid-conversation
+re-enters the same thread with prior decisions, rejected options, and the running
+conversation already in context, so the concierge carries forward what is still
+valid instead of restarting.
 
 ## Micro-tasks
 _A granular checklist of the immediate next steps needed to complete the current task._
@@ -71,6 +90,19 @@ _A granular checklist of the immediate next steps needed to complete the current
   - [x] Allergies stored with severity; escalation-only merge (verified by test)
   - [x] Server-side `enforceAllergySafety` guard (verified against 5 failure modes)
   - [x] Per-hotel verdict UI + severe-allergy warning banner
+- [x] **Per-tool detail + per-tour memory** (2026-07-25)
+  - [x] `tools.js` — 10 service areas, each flagged `allergyRelevant`
+  - [x] Per-tool preferences and learned notes on each profile (isolated — verified)
+  - [x] Tours per person; one conversation thread per (tour, tool) — isolation verified
+  - [x] Threads persist messages, locked-in decisions, and considered options
+        with chosen/rejected status
+  - [x] Prompt carries prior decisions + rejected options + conversation so a
+        route change supersedes rather than restarts (`supersededDecisions`)
+  - [x] Allergy guard now scoped by `allergyRelevant` (verified across hotel /
+        transport / medical)
+- [x] **UI rebuild** (2026-07-25) — chip editors replace the overflowing
+      comma-separated inputs; tool tabs, sticky sidebar, collapsible sections,
+      split `styles.css` / `app.js`
 - [ ] Handle remaining edge cases (no location given, no results, search rate limits)
 - [ ] Next recommended: roadmap #2 (link verification) and #3 (structured extraction)
 

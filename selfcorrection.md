@@ -16,7 +16,12 @@ _Specific coding preferences and stylistic choices issued by the user._
 ## Stylistic Choices
 _Formatting, naming, and structural conventions the user prefers._
 
-- _None recorded yet._
+- **List-valued fields use chip/pill editors**, never comma-separated single-line
+  inputs — those overflow and read badly once there are more than two values.
+- Keep the layout roomy: sticky sidebar, collapsible (`<details>`) sections for
+  secondary information, and horizontal tabs for the service areas.
+- Frontend assets stay split: `public/index.html` (markup), `public/styles.css`,
+  `public/app.js`.
 
 ## Provider Preferences
 _Which third-party services to use._
@@ -44,3 +49,6 @@ _A cumulative log of corrections issued during development, with dates._
 | 2026-07-24 | For roadmap/ideation requests: no code — deliver the list and reasoning only. | AI/ML robustness roadmap. |
 | 2026-07-25 | Build roadmap #1 (Preference Profiles + continuous learning) with a right-side create/navigate panel, and roadmap #4 (allergy safety). | Tier 1 hardening. |
 | 2026-07-25 | Profile details are per-profile and persistent; profile management belongs in a right-hand sidebar. | UI placement preference. |
+| 2026-07-25 | **UI quality matters — do not ship cramped layouts.** Long comma-separated values in single-line inputs overflow and look bad. Use chip/pill editors for list fields, give the layout room, and split CSS/JS out of the HTML. | UI rebuild. |
+| 2026-07-25 | Each person needs per-tool detail (10 service areas), not one flat preference set. | Data model. |
+| 2026-07-25 | Each tour must remember its own decisions per tool, so mid-conversation route changes carry prior context forward instead of restarting. | Tour memory. |

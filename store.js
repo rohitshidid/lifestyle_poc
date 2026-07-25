@@ -1,13 +1,21 @@
-// Preference Profile store.
+// Preference store.
+//
+// Shape:
+//   Profile (a person)
+//     ├── global constraints (dietary, allergies, preferences, learned notes)
+//     ├── tools{}  — per-tool preferences, so hotel prefs never leak into transport
+//     └── tours[]  — a tour has one thread PER TOOL, and each thread remembers
+//                    its own conversation, decisions, and everything considered
 //
 // Deliberately a flat JSON file: a POC needs zero-setup persistence, and the
-// surface here (list/get/create/update/remove/merge) is small enough to swap for
-// a real database without touching callers.
+// surface here is small enough to swap for a real database without touching
+// callers.
 
 import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
+import { TOOL_IDS } from "./tools.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, "data");
@@ -19,7 +27,8 @@ let writeQueue = Promise.resolve();
 
 async function readAll() {
   try {
-    return JSON.parse(await fs.readFile(DB_PATH, "utf8"));
+    const parsed = JSON.parse(await fs.readFile(DB_PATH, "utf8"));
+    return parsed.map(normalizeProfile);
   } catch (err) {
     if (err.code === "ENOENT") return [];
     throw err;
@@ -33,9 +42,58 @@ async function writeAll(profiles) {
 
 function serialize(fn) {
   const next = writeQueue.then(fn, fn);
-  // Keep the chain alive even if one operation rejects.
-  writeQueue = next.catch(() => {});
+  writeQueue = next.catch(() => {}); // keep the chain alive after a failure
   return next;
+}
+
+// ---------------------------------------------------------------------------
+// Normalization — lets profiles written by an older version load cleanly.
+// ---------------------------------------------------------------------------
+
+function blankThread() {
+  return {
+    messages: [], // {role: "user"|"agent", text, at}
+    decisions: [], // {at, text} — standing choices for this tour+tool
+    considered: [], // {at, name, url, status, reason} — options already seen
+  };
+}
+
+function blankTour(name) {
+  const now = new Date().toISOString();
+  return {
+    id: crypto.randomUUID(),
+    name: name || "Untitled tour",
+    createdAt: now,
+    updatedAt: now,
+    threads: {}, // toolId -> thread, created lazily
+  };
+}
+
+function normalizeProfile(p) {
+  const tools = {};
+  for (const id of TOOL_IDS) {
+    const t = p.tools?.[id] || {};
+    tools[id] = {
+      preferences: Array.isArray(t.preferences) ? t.preferences : [],
+      notes: Array.isArray(t.notes) ? t.notes : [],
+    };
+  }
+  return {
+    id: p.id,
+    name: p.name || "Untitled profile",
+    createdAt: p.createdAt || new Date().toISOString(),
+    updatedAt: p.updatedAt || new Date().toISOString(),
+    dietary: p.dietary || [],
+    allergies: (p.allergies || []).map(normalizeAllergy).filter(Boolean),
+    otherPreferences: p.otherPreferences || [],
+    notes: p.notes || [],
+    tools,
+    tours: (p.tours || []).map((t) => ({
+      ...blankTour(t.name),
+      ...t,
+      threads: t.threads || {},
+    })),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -58,16 +116,14 @@ export function normalizeSeverity(value) {
 
 function normalizeAllergy(entry) {
   if (!entry) return null;
-  if (typeof entry === "string") {
-    return { name: entry.trim(), severity: "unknown" };
-  }
+  if (typeof entry === "string") return { name: entry.trim(), severity: "unknown" };
   const name = String(entry.name || "").trim();
   if (!name) return null;
   return { name, severity: normalizeSeverity(entry.severity) };
 }
 
 /** Merge allergy lists, keeping the highest severity ever recorded for a name. */
-function mergeAllergies(existing = [], incoming = []) {
+export function mergeAllergies(existing = [], incoming = []) {
   const byName = new Map();
   for (const raw of [...existing, ...incoming]) {
     const a = normalizeAllergy(raw);
@@ -87,7 +143,7 @@ function mergeAllergies(existing = [], incoming = []) {
 }
 
 /** Case-insensitive union of two string lists, preserving first-seen casing. */
-function mergeStrings(existing = [], incoming = []) {
+export function mergeStrings(existing = [], incoming = []) {
   const seen = new Map();
   for (const raw of [...existing, ...incoming]) {
     const s = String(raw || "").trim();
@@ -98,8 +154,14 @@ function mergeStrings(existing = [], incoming = []) {
   return [...seen.values()];
 }
 
+// ---------------------------------------------------------------------------
+// Profiles
+// ---------------------------------------------------------------------------
+
 function blankProfile(name) {
   const now = new Date().toISOString();
+  const tools = {};
+  for (const id of TOOL_IDS) tools[id] = { preferences: [], notes: [] };
   return {
     id: crypto.randomUUID(),
     name: name || "Untitled profile",
@@ -108,11 +170,9 @@ function blankProfile(name) {
     dietary: [],
     allergies: [],
     otherPreferences: [],
-    // Durable free-text facts learned across interactions (e.g. "prefers high
-    // floors", "disliked the Berlin Marriott").
     notes: [],
-    // Lightweight trip log so the profile shows its own history.
-    history: [],
+    tools,
+    tours: [],
   };
 }
 
@@ -134,7 +194,6 @@ export async function createProfile(data = {}) {
       dietary: mergeStrings([], data.dietary),
       allergies: mergeAllergies([], data.allergies),
       otherPreferences: mergeStrings([], data.otherPreferences),
-      notes: mergeStrings([], data.notes),
     };
     profiles.push(profile);
     await writeAll(profiles);
@@ -142,66 +201,41 @@ export async function createProfile(data = {}) {
   });
 }
 
-/** Replace fields outright — used by the manual profile editor in the UI. */
+/** Replace global fields outright — used by the manual profile editor. */
 export async function updateProfile(id, patch = {}) {
   return serialize(async () => {
     const profiles = await readAll();
     const i = profiles.findIndex((p) => p.id === id);
     if (i === -1) return null;
-
-    const current = profiles[i];
-    const updated = {
-      ...current,
-      name: patch.name !== undefined ? String(patch.name).trim() || current.name : current.name,
-      dietary: patch.dietary !== undefined ? mergeStrings([], patch.dietary) : current.dietary,
+    const cur = profiles[i];
+    profiles[i] = {
+      ...cur,
+      name: patch.name !== undefined ? String(patch.name).trim() || cur.name : cur.name,
+      dietary: patch.dietary !== undefined ? mergeStrings([], patch.dietary) : cur.dietary,
       allergies:
-        patch.allergies !== undefined
-          ? mergeAllergies([], patch.allergies)
-          : current.allergies,
+        patch.allergies !== undefined ? mergeAllergies([], patch.allergies) : cur.allergies,
       otherPreferences:
         patch.otherPreferences !== undefined
           ? mergeStrings([], patch.otherPreferences)
-          : current.otherPreferences,
-      notes: patch.notes !== undefined ? mergeStrings([], patch.notes) : current.notes,
+          : cur.otherPreferences,
+      notes: patch.notes !== undefined ? mergeStrings([], patch.notes) : cur.notes,
       updatedAt: new Date().toISOString(),
     };
-    profiles[i] = updated;
     await writeAll(profiles);
-    return updated;
+    return profiles[i];
   });
 }
 
-/**
- * Continuous learning: fold newly-observed durable facts into a profile.
- * Additive by design — learning never removes a stored constraint, because a
- * single ambiguous sentence should not be able to erase a standing allergy.
- */
-export async function mergeLearnings(id, learnings = {}, historyEntry = null) {
+/** Replace the preference list for one tool on one profile. */
+export async function setToolPreferences(profileId, toolId, preferences) {
   return serialize(async () => {
     const profiles = await readAll();
-    const i = profiles.findIndex((p) => p.id === id);
-    if (i === -1) return null;
-
-    const current = profiles[i];
-    const updated = {
-      ...current,
-      dietary: mergeStrings(current.dietary, learnings.dietary),
-      allergies: mergeAllergies(current.allergies, learnings.allergies),
-      otherPreferences: mergeStrings(current.otherPreferences, learnings.otherPreferences),
-      notes: mergeStrings(current.notes, learnings.notes),
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (historyEntry) {
-      updated.history = [
-        { at: new Date().toISOString(), ...historyEntry },
-        ...(current.history || []),
-      ].slice(0, 25);
-    }
-
-    profiles[i] = updated;
+    const i = profiles.findIndex((p) => p.id === profileId);
+    if (i === -1 || !TOOL_IDS.includes(toolId)) return null;
+    profiles[i].tools[toolId].preferences = mergeStrings([], preferences);
+    profiles[i].updatedAt = new Date().toISOString();
     await writeAll(profiles);
-    return updated;
+    return profiles[i];
   });
 }
 
@@ -215,4 +249,141 @@ export async function deleteProfile(id) {
   });
 }
 
-export { mergeAllergies, mergeStrings };
+// ---------------------------------------------------------------------------
+// Tours
+// ---------------------------------------------------------------------------
+
+export async function createTour(profileId, name) {
+  return serialize(async () => {
+    const profiles = await readAll();
+    const i = profiles.findIndex((p) => p.id === profileId);
+    if (i === -1) return null;
+    const tour = blankTour(name);
+    profiles[i].tours.unshift(tour);
+    profiles[i].updatedAt = new Date().toISOString();
+    await writeAll(profiles);
+    return tour;
+  });
+}
+
+export async function deleteTour(profileId, tourId) {
+  return serialize(async () => {
+    const profiles = await readAll();
+    const i = profiles.findIndex((p) => p.id === profileId);
+    if (i === -1) return false;
+    const before = profiles[i].tours.length;
+    profiles[i].tours = profiles[i].tours.filter((t) => t.id !== tourId);
+    if (profiles[i].tours.length === before) return false;
+    await writeAll(profiles);
+    return true;
+  });
+}
+
+export async function getThread(profileId, tourId, toolId) {
+  const profile = await getProfile(profileId);
+  const tour = profile?.tours.find((t) => t.id === tourId);
+  if (!tour) return null;
+  return tour.threads[toolId] || blankThread();
+}
+
+/**
+ * Append a turn to a tour+tool thread and fold in whatever the agent decided or
+ * considered. This is the tour memory: it is what lets a later message in the
+ * same thread know what was already chosen and already ruled out.
+ */
+export async function appendThreadTurn(profileId, tourId, toolId, turn = {}) {
+  return serialize(async () => {
+    const profiles = await readAll();
+    const pi = profiles.findIndex((p) => p.id === profileId);
+    if (pi === -1) return null;
+    const ti = profiles[pi].tours.findIndex((t) => t.id === tourId);
+    if (ti === -1) return null;
+
+    const tour = profiles[pi].tours[ti];
+    const thread = tour.threads[toolId] || blankThread();
+    const now = new Date().toISOString();
+
+    for (const m of turn.messages || []) {
+      thread.messages.push({ at: now, ...m });
+    }
+    // Keep threads bounded — the model gets a recent window, not the whole life
+    // story, and the file stays a sane size.
+    if (thread.messages.length > 60) {
+      thread.messages = thread.messages.slice(-60);
+    }
+
+    for (const d of turn.decisions || []) {
+      const text = String(d || "").trim();
+      if (text && !thread.decisions.some((x) => x.text.toLowerCase() === text.toLowerCase())) {
+        thread.decisions.push({ at: now, text });
+      }
+    }
+
+    for (const opt of turn.considered || []) {
+      if (!opt?.name) continue;
+      const key = opt.name.toLowerCase();
+      const existing = thread.considered.find((c) => c.name.toLowerCase() === key);
+      if (existing) {
+        // Update status if this turn changed it (e.g. considered -> rejected).
+        if (opt.status) existing.status = opt.status;
+        if (opt.reason) existing.reason = opt.reason;
+        existing.at = now;
+      } else {
+        thread.considered.push({
+          at: now,
+          name: opt.name,
+          url: opt.url || "",
+          status: opt.status || "considered",
+          reason: opt.reason || "",
+        });
+      }
+    }
+
+    tour.threads[toolId] = thread;
+    tour.updatedAt = now;
+    profiles[pi].updatedAt = now;
+    await writeAll(profiles);
+    return thread;
+  });
+}
+
+/** Manually mark an option chosen/rejected from the UI. */
+export async function setOptionStatus(profileId, tourId, toolId, name, status, reason = "") {
+  return appendThreadTurn(profileId, tourId, toolId, {
+    considered: [{ name, status, reason }],
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Continuous learning
+//
+// Additive by design — learning never removes a stored constraint, because a
+// single ambiguous sentence should not be able to erase a standing allergy.
+// Global facts go on the profile; tool-specific facts go on that tool only.
+// ---------------------------------------------------------------------------
+
+export async function mergeLearnings(profileId, toolId, learnings = {}) {
+  return serialize(async () => {
+    const profiles = await readAll();
+    const i = profiles.findIndex((p) => p.id === profileId);
+    if (i === -1) return null;
+
+    const cur = profiles[i];
+    const g = learnings.global || {};
+    const t = learnings.tool || {};
+
+    cur.dietary = mergeStrings(cur.dietary, g.dietary);
+    cur.allergies = mergeAllergies(cur.allergies, g.allergies);
+    cur.otherPreferences = mergeStrings(cur.otherPreferences, g.otherPreferences);
+    cur.notes = mergeStrings(cur.notes, g.notes);
+
+    if (TOOL_IDS.includes(toolId)) {
+      cur.tools[toolId].preferences = mergeStrings(cur.tools[toolId].preferences, t.preferences);
+      cur.tools[toolId].notes = mergeStrings(cur.tools[toolId].notes, t.notes);
+    }
+
+    cur.updatedAt = new Date().toISOString();
+    await writeAll(profiles);
+    return cur;
+  });
+}
