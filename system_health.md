@@ -35,6 +35,11 @@ _Core architectural rules, tech stack constraints, and absolute boundaries._
   may only ever escalate on merge (`store.js`), and no hotel may reach the user
   without an explicit verdict — any missing, malformed, or evidence-free "safe"
   claim is forced to `unverified` server-side (`server.js` → `enforceAllergySafety`).
+- **The system cannot book anything, and must never imply that it has.** Itinerary
+  segment status is derived server-side (`deriveSegmentStatus`) from state a human
+  created; the model's `status` output is discarded. Only a user pressing "Mark as
+  booked" produces `confirmed`. Same principle as the allergy rule: a claim without
+  evidence behind it does not reach the user.
 - Continuous learning is **additive only** — it never deletes a stored constraint,
   because one ambiguous sentence must not be able to erase a standing allergy.
 

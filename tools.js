@@ -129,6 +129,18 @@ export const TOOLS = [
 export const TOOL_IDS = TOOLS.map((t) => t.id);
 export const MASTER_TOOL_ID = "itinerary";
 
+// Itinerary segment states.
+//
+// Nothing in this system can make a reservation, so there is no state that
+// means "a booking exists" unless a human told us they made one. The model is
+// never allowed to set these — the server derives them (see
+// deriveSegmentStatus in server.js).
+export const SEGMENT_STATUS = {
+  PLANNED: "planned", // the concierge proposed it; nothing has happened
+  SELECTED: "selected", // a specialist chat has this option marked chosen
+  CONFIRMED: "confirmed", // the user booked it themselves and told us
+};
+
 export function getTool(id) {
   return TOOLS.find((t) => t.id === id) || null;
 }

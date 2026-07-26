@@ -35,8 +35,22 @@ and 6 gear cases") and it composes a **day-by-day itinerary**, pulling in whatev
 the specialist chats have already locked in.
 
 Each day is a timeline of segments with a **time**, what happens, where, the
-provider, **a direct booking link**, and whether it's already booked or still to
-book. Anything physically moving between cities — gear, merch, instruments — is
+provider, and **a direct booking link**.
+
+### Nothing here is booked until you book it
+
+The app cannot make reservations, so it never claims one exists. Each segment
+carries one of three states, all derived from things a human actually did — the
+model's own claims are discarded:
+
+| State | Meaning |
+|---|---|
+| `suggested` | The concierge proposed it. Nothing has happened. |
+| `your pick — not booked` | You chose this option in a specialist chat. Still not a reservation. |
+| `booked by you` | You booked it yourself and pressed **Mark as booked** (optionally with a reference number). |
+
+Confirmations are keyed to the day and the segment title, so if the planner later
+shifts a confirmed pickup by 15 minutes it stays confirmed. Anything physically moving between cities — gear, merch, instruments — is
 tracked separately with its carrier, collection window, and required arrival time,
 so shipping that lands after load-in gets flagged. Anything still unresolved shows
 up in a "still to sort" list.

@@ -590,3 +590,41 @@ details.section > .inner { padding-top: 12px; }
   color: #1e1503;
   border-color: var(--accent);
 }
+
+/* ------------------------------------------------- booking status honesty */
+
+.disclaimer {
+  background: rgba(216,178,92,0.07);
+  border: 1px solid rgba(216,178,92,0.3);
+  border-radius: var(--radius);
+  padding: 9px 13px;
+  font-size: 0.83rem;
+  color: var(--warn);
+  margin-bottom: 16px;
+}
+
+/* Only a user-confirmed booking gets the solid green treatment. A merely
+   "selected" segment is deliberately muted so it cannot be mistaken for one. */
+.seg.confirmed::before { background: var(--good); }
+.seg.selected::before { background: var(--accent); }
+.seg.planned::before { background: var(--line-2); }
+
+.seg.confirmed .seg-time { color: var(--good); }
+.seg.selected .seg-time { color: var(--accent); }
+
+.status-badge.confirmed {
+  border-color: var(--good);
+  color: var(--good);
+  background: rgba(111,177,160,0.12);
+}
+.status-badge.selected {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.seg-ref {
+  font-size: 0.79rem;
+  color: var(--good);
+  margin-top: 5px;
+  font-variant-numeric: tabular-nums;
+}

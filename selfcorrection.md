@@ -55,3 +55,4 @@ _A cumulative log of corrections issued during development, with dates._
 | 2026-07-25 | Considered options must be clickable to re-read the summary generated for that place. | Sidebar UX. |
 | 2026-07-25 | **Personal/dietary facts stated in ANY chat must propagate to the person globally**, so they apply across every other chat. | Cross-cutting preferences. |
 | 2026-07-25 | Add a master "Tour Planner" as the FIRST tool — combines all other chats into one full itinerary with day-by-day flow, times, what is carried between places, and direct booking links. | Master itinerary. |
+| 2026-07-25 | **Never label anything "booked" that the system did not actually book.** The model claimed BOOKED on segments including a hotel breakfast; nothing had been reserved. Status must be derived from real user action, not model output. | Itinerary status bug. |

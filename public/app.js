@@ -275,10 +275,23 @@ function renderItinerary(it) {
   card.classList.remove("hidden");
   $("itineraryTitle").textContent = it.title || "Tour itinerary";
 
+  // The app cannot make reservations. Say so plainly rather than letting a
+  // status badge imply otherwise.
+  $("itineraryDisclaimer").innerHTML =
+    "This is a plan, not a set of reservations — nothing here is booked until you book it and mark it. Use the links to book directly.";
+
   const typeIcon = {
     flights: "✈️", transport: "🚐", hotel: "🏨", dining: "🍽️", catering: "🥗",
     courier: "📦", venue: "🎤", wellness: "🧘", medical: "⚕️", grocery: "🛒",
     downtime: "🎧", other: "•",
+  };
+
+  // Booking state is derived server-side from what the user actually did.
+  // "confirmed" only ever means the user pressed Mark as booked.
+  const badge = {
+    confirmed: { label: "booked by you", cls: "confirmed" },
+    selected: { label: "your pick — not booked", cls: "selected" },
+    planned: { label: "suggested", cls: "" },
   };
 
   $("itineraryDays").innerHTML = (it.days || [])
@@ -290,9 +303,10 @@ function renderItinerary(it) {
         ${d.city ? `<span class="day-city">${esc(d.city)}</span>` : ""}
       </div>
       ${(d.segments || [])
-        .map(
-          (s) => `
-        <div class="seg ${s.status === "booked" ? "booked" : ""}">
+        .map((s) => {
+          const b = badge[s.status] || badge.planned;
+          return `
+        <div class="seg ${esc(s.status || "planned")}">
           <div class="seg-time">${esc(s.time || "TBC")}</div>
           <div class="seg-body">
             <div class="seg-title">
@@ -302,9 +316,7 @@ function renderItinerary(it) {
                   ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a>`
                   : esc(s.title)
               }
-              <span class="status-badge ${s.status === "booked" ? "chosen" : ""}">${
-                s.status === "booked" ? "booked" : "to book"
-              }</span>
+              <span class="status-badge ${b.cls}">${b.label}</span>
             </div>
             ${
               s.location || s.provider
@@ -315,13 +327,49 @@ function renderItinerary(it) {
             }
             ${s.carrying ? `<div class="seg-carry">📦 Carrying: ${esc(s.carrying)}</div>` : ""}
             ${s.notes ? `<div class="seg-notes">${esc(s.notes)}</div>` : ""}
+            ${
+              s.reference
+                ? `<div class="seg-ref">Ref: ${esc(s.reference)}</div>`
+                : ""
+            }
+            <div class="row tight" style="margin-top:7px;">
+              ${
+                s.status === "confirmed"
+                  ? `<button class="ghost xs" data-unconfirm="${esc(s.segmentKey)}">Undo booked</button>`
+                  : `<button class="ghost xs" data-confirm="${esc(s.segmentKey)}">Mark as booked</button>`
+              }
+              ${
+                s.url
+                  ? `<a class="ci-link" href="${esc(s.url)}" target="_blank" rel="noopener">Book ↗</a>`
+                  : ""
+              }
+            </div>
           </div>
-        </div>`,
-        )
+        </div>`;
+        })
         .join("")}
     </div>`,
     )
     .join("");
+
+  $("itineraryDays")
+    .querySelectorAll("button[data-confirm]")
+    .forEach((b) => {
+      b.onclick = async () => {
+        const ref = prompt(
+          "Booking reference or confirmation number (optional — leave blank if you don't have one):",
+          "",
+        );
+        if (ref === null) return; // cancelled
+        await confirmSegment(b.dataset.confirm, ref, true);
+      };
+    });
+
+  $("itineraryDays")
+    .querySelectorAll("button[data-unconfirm]")
+    .forEach((b) => {
+      b.onclick = () => confirmSegment(b.dataset.unconfirm, "", false);
+    });
 
   const logi = it.logistics || [];
   $("logisticsBlock").innerHTML = logi.length
@@ -568,6 +616,18 @@ $("saveToolPrefs").onclick = async () => {
   flash("toolPrefMsg", "Saved.");
   await loadProfiles();
 };
+
+/** Mark (or unmark) an itinerary segment as actually booked by the user. */
+async function confirmSegment(key, reference, confirmed) {
+  const r = await fetch(`/api/profiles/${activeProfileId}/tours/${activeTourId}/confirm`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ segmentKey: key, reference, confirmed }),
+  });
+  if (!r.ok) return;
+  const summary = await r.json();
+  if (summary.itinerary) renderItinerary(summary.itinerary);
+}
 
 async function markOption(name, status) {
   await fetch(

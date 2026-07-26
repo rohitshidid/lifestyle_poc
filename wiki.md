@@ -120,6 +120,11 @@ _Specific anchors / line-number references linking documentation to exact lines 
 - `enforceAllergySafety()` — **the safety boundary.** Rewrites any missing,
   invalid, or unevidenced verdict to `unverified`; returns `not_applicable` when
   no allergies are recorded or the tool isn't allergy-relevant.
+- `deriveSegmentStatus()` / `applyBookingStatus()` — **the booking-truth boundary.**
+  The model may not declare anything booked; its `status` is discarded and replaced
+  with `confirmed` (user pressed Mark as booked), `selected` (the segment's provider
+  matches an option the user chose in a specialist chat), or `planned` (everything
+  else). Keyed by `segmentKey()` so confirmations survive a re-plan.
 - Routes — `/api/tools`; profile CRUD; `PUT /api/profiles/:id/tools/:toolId`;
   tour create/delete; `GET .../threads/:toolId`; `POST .../threads/:toolId/status`.
 - `POST /api/chat` — the main endpoint tying all of the above together.

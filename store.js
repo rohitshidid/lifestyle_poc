@@ -70,7 +70,27 @@ function blankTour(name) {
     updatedAt: now,
     threads: {}, // toolId -> thread, created lazily
     itinerary: null, // last plan composed by the master Tour Planner
+    // Segments the USER has confirmed they actually booked, keyed by
+    // segmentKey(). The model can never write here — a booking only exists
+    // because a human said so.
+    confirmations: {},
   };
+}
+
+/**
+ * Stable identity for an itinerary segment across re-plans.
+ *
+ * Deliberately derived from day + title rather than including the time: if the
+ * planner shifts a confirmed pickup by 15 minutes, that is the same real-world
+ * booking and the confirmation should survive.
+ */
+export function segmentKey(day, segment) {
+  const norm = (s) =>
+    String(s || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  return `${norm(day)}::${norm(segment.title)}`;
 }
 
 function normalizeProfile(p) {
@@ -97,6 +117,7 @@ function normalizeProfile(p) {
       ...t,
       threads: t.threads || {},
       itinerary: t.itinerary || null,
+      confirmations: t.confirmations || {},
     })),
   };
 }
@@ -404,7 +425,44 @@ export async function getTourSummary(profileId, tourId) {
     });
   }
 
-  return { tourName: tour.name, areas, itinerary: tour.itinerary || null };
+  return {
+    tourName: tour.name,
+    areas,
+    itinerary: tour.itinerary || null,
+    confirmations: tour.confirmations || {},
+    // Flat list of every option the user has actually chosen in a specialist
+    // chat — used to derive whether a segment is merely planned or selected.
+    chosenNames: areas.flatMap((a) => a.chosen.map((c) => c.name)),
+  };
+}
+
+/**
+ * Record that the user actually booked a segment. This is the ONLY way a
+ * segment becomes "confirmed" — no model output can produce this state.
+ * Pass `null` as reference to clear a confirmation.
+ */
+export async function confirmSegment(profileId, tourId, key, reference = "", confirmed = true) {
+  return serialize(async () => {
+    const profiles = await readAll();
+    const pi = profiles.findIndex((p) => p.id === profileId);
+    if (pi === -1) return null;
+    const ti = profiles[pi].tours.findIndex((t) => t.id === tourId);
+    if (ti === -1) return null;
+
+    const tour = profiles[pi].tours[ti];
+    tour.confirmations = tour.confirmations || {};
+    if (confirmed) {
+      tour.confirmations[key] = {
+        at: new Date().toISOString(),
+        reference: String(reference || "").trim(),
+      };
+    } else {
+      delete tour.confirmations[key];
+    }
+    tour.updatedAt = new Date().toISOString();
+    await writeAll(profiles);
+    return tour.confirmations;
+  });
 }
 
 /** Persist the plan the master planner produced for this tour. */
@@ -418,7 +476,10 @@ export async function saveItinerary(profileId, tourId, itinerary) {
     profiles[pi].tours[ti].itinerary = { ...itinerary, updatedAt: new Date().toISOString() };
     profiles[pi].tours[ti].updatedAt = new Date().toISOString();
     await writeAll(profiles);
-    return profiles[pi].tours[ti].itinerary;
+    return {
+      itinerary: profiles[pi].tours[ti].itinerary,
+      confirmations: profiles[pi].tours[ti].confirmations || {},
+    };
   });
 }
 

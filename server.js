@@ -3,7 +3,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI } from "@google/genai";
-import { TOOLS, TOOL_IDS, MASTER_TOOL_ID, getTool } from "./tools.js";
+import { TOOLS, TOOL_IDS, MASTER_TOOL_ID, SEGMENT_STATUS, getTool } from "./tools.js";
 import {
   listProfiles,
   getProfile,
@@ -19,6 +19,8 @@ import {
   mergeLearnings,
   getTourSummary,
   saveItinerary,
+  confirmSegment,
+  segmentKey,
   normalizeSeverity,
 } from "./store.js";
 
@@ -116,14 +118,15 @@ For every segment give:
 - "provider" — the company/venue/hotel, if known
 - "url"      — a REAL booking or info link so the user can book directly. Empty string if you have none. NEVER invent a URL.
 - "carrying" — what physically moves with this segment (gear cases, merch, instruments), if anything
-- "notes"    — anything the user needs to know (confirmation needed, buffer, contact)
-- "status"   — "booked" if a specialist area already locked it in, otherwise "to_book"
+- "notes"    — anything the user needs to know (buffer, contact, what to reconfirm)
+
+**Do NOT output a "status" field, and never describe anything as booked, confirmed, reserved, or arranged.** You cannot make reservations and neither can this system. Every segment you produce is a *proposal* until the user books it themselves. The application tracks booking state separately and will overwrite anything you claim.
 
 ## Carrying things between places
 Track every item that moves between cities in "logistics": what it is, from where, to where, by what method/carrier, when it is collected, when it must arrive, and a booking link. If gear is being shipped rather than travelling with the party, make that explicit and make sure it arrives BEFORE the load-in that needs it. Flag it in "gaps" if the timing does not work.
 
 ## Use what is already decided
-Segments backed by a specialist area's locked-in decision are "booked" — reuse the exact venue/hotel/carrier name and link from there. Do not re-propose alternatives for something already chosen. List anything still missing in "gaps".
+Where a specialist area has already CHOSEN an option, reuse that exact venue/hotel/carrier name and link — do not re-propose alternatives for it. Note that "chosen" means the user picked it as their preferred option, NOT that it is booked. List anything still missing in "gaps".
 
 ## Allergy safety
 Any segment involving food (dining, catering, grocery, hotel breakfast) must respect the artist's allergies. Where you cannot verify allergen handling, say so in that segment's "notes" — never imply it is safe without evidence.
@@ -146,7 +149,7 @@ Reply conversationally first, then end with EXACTLY ONE fenced JSON code block (
           {
             "time": "14:30", "type": "transport", "title": "Airport pickup",
             "location": "BER Terminal 1", "provider": "…", "url": "https://…",
-            "carrying": "4 flight cases + 2 guitars", "notes": "…", "status": "to_book"
+            "carrying": "4 flight cases + 2 guitars", "notes": "…"
           }
         ]
       }
@@ -324,6 +327,53 @@ function extractJson(text) {
 // forced to "unverified".
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Itinerary booking status
+//
+// The model is not permitted to declare anything booked, for the same reason it
+// is not permitted to declare a hotel allergy-safe: it has no way to know, and
+// the failure mode is someone turning up somewhere with no reservation. Status
+// is derived here from state a human actually created:
+//
+//   confirmed — the user pressed "Mark as booked" (optionally with a reference)
+//   selected  — the user chose this option in a specialist chat
+//   planned   — everything else: a proposal and nothing more
+//
+// Whatever the model put in `status` is discarded.
+// ---------------------------------------------------------------------------
+
+function deriveSegmentStatus(day, segment, { confirmations, chosenNames }) {
+  const key = segmentKey(day, segment);
+  const confirmation = confirmations?.[key];
+  if (confirmation) {
+    return {
+      key,
+      status: SEGMENT_STATUS.CONFIRMED,
+      confirmedAt: confirmation.at,
+      reference: confirmation.reference || "",
+    };
+  }
+
+  const haystack = `${segment.provider || ""} ${segment.title || ""}`.toLowerCase();
+  const matched = (chosenNames || []).some((n) => n && haystack.includes(n.toLowerCase()));
+  return { key, status: matched ? SEGMENT_STATUS.SELECTED : SEGMENT_STATUS.PLANNED };
+}
+
+function applyBookingStatus(itinerary, ctx) {
+  if (!itinerary) return itinerary;
+  return {
+    ...itinerary,
+    days: (itinerary.days || []).map((d) => ({
+      ...d,
+      segments: (d.segments || []).map((s) => {
+        const { status, key, confirmedAt, reference } = deriveSegmentStatus(d.day, s, ctx);
+        // Drop whatever the model claimed and replace it with derived truth.
+        return { ...s, status, segmentKey: key, confirmedAt, reference };
+      }),
+    })),
+  };
+}
+
 const VALID_STATUS = new Set(["verified", "unverified", "risk", "not_applicable"]);
 
 function enforceAllergySafety(options, activeAllergies, tool) {
@@ -426,6 +476,34 @@ app.delete("/api/profiles/:id/tours/:tourId", async (req, res) => {
 app.get("/api/profiles/:id/tours/:tourId/itinerary", async (req, res) => {
   const summary = await getTourSummary(req.params.id, req.params.tourId);
   if (!summary) return res.status(404).json({ error: "Tour not found." });
+  summary.itinerary = applyBookingStatus(summary.itinerary, {
+    confirmations: summary.confirmations,
+    chosenNames: summary.chosenNames,
+  });
+  res.json(summary);
+});
+
+/**
+ * The only way a segment becomes "confirmed" — a human saying they booked it.
+ */
+app.post("/api/profiles/:id/tours/:tourId/confirm", async (req, res) => {
+  const { segmentKey: key, reference, confirmed } = req.body || {};
+  if (!key) return res.status(400).json({ error: "segmentKey is required." });
+
+  const confirmations = await confirmSegment(
+    req.params.id,
+    req.params.tourId,
+    key,
+    reference || "",
+    confirmed !== false,
+  );
+  if (!confirmations) return res.status(404).json({ error: "Tour not found." });
+
+  const summary = await getTourSummary(req.params.id, req.params.tourId);
+  summary.itinerary = applyBookingStatus(summary.itinerary, {
+    confirmations: summary.confirmations,
+    chosenNames: summary.chosenNames,
+  });
   res.json(summary);
 });
 
@@ -541,7 +619,13 @@ app.post("/api/chat", async (req, res) => {
     });
 
     if (isPlanner && data.itinerary) {
-      data.itinerary = await saveItinerary(profileId, tourId, data.itinerary);
+      const saved = await saveItinerary(profileId, tourId, data.itinerary);
+      // Booking state is derived from what the user actually did, never from
+      // what the model claimed.
+      data.itinerary = applyBookingStatus(saved.itinerary, {
+        confirmations: saved.confirmations,
+        chosenNames: summary?.chosenNames || [],
+      });
     }
 
     const updatedProfile = await mergeLearnings(profileId, toolId, data.profileUpdates || {});
