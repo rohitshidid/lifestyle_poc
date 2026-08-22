@@ -3,7 +3,7 @@
 > Maintained by the IHMS (Intelligent Health Monitoring System).
 > Tracks the active state and trajectory of the project. Updated after every interaction.
 
-_Last updated: 2026-07-24_
+_Last updated: 2026-08-07_
 
 ## Product Vision
 A concierge / lifestyle-management platform for touring musicians. Artists (and/or
@@ -42,6 +42,20 @@ _Core architectural rules, tech stack constraints, and absolute boundaries._
   evidence behind it does not reach the user.
 - Continuous learning is **additive only** — it never deletes a stored constraint,
   because one ambiguous sentence must not be able to erase a standing allergy.
+- **Allergies are party-wide.** The allergy boundary spans everyone travelling, not
+  just the artist (`partyAllergies` in `store.js`); a companion's severe allergy is
+  as binding as the artist's, and every warning names whose it is.
+- **The model may not invent a rewards programme or a points figure.**
+  `enforceLoyalty` (`server.js`) drops any programme the person does not hold in a
+  category that can earn on that service area, and strips any accrual number — there
+  is no live balance to compute one from. Same evidence rule as allergies and bookings.
+- **Prices are facts from the profile, never model output.** The agency fee attached
+  to an option or segment comes from `profile.agency`, and a fee is only ever charged
+  against a booking a human confirmed, with the channel they chose.
+- **Public-domain research is suggestion-only.** Nothing found by enrichment reaches
+  the profile without a human pressing Accept; a suggestion with no resolvable source
+  URL is discarded server-side; health claims from public sources are filed as notes
+  to verify, never as stored constraints.
 
 ## Active Rules
 _Current development guidelines in effect._
@@ -52,8 +66,10 @@ _Current development guidelines in effect._
 ## Current Tasks
 _The macro-level task currently being worked on._
 
-- Per-person × per-tool × per-tour architecture with conversational memory,
-  plus a rebuilt UI. Implemented 2026-07-25.
+- Client-feedback round: travelling party with per-member constraints, preferred
+  suppliers, loyalty/VIP programme tracking, travel-agency booking channel with
+  per-booking fee accounting, and human-approved public-domain enrichment.
+  Implemented 2026-08-07.
 
 ## Data Hierarchy
 The core model everything hangs off:
@@ -62,6 +78,12 @@ The core model everything hangs off:
 Person (profile)
   ├── global constraints  (dietary, allergies, standing preferences, learned notes)
   │                       ← ANY chat can write here; applies everywhere
+  ├── party[]             (travelling companions, each with their OWN constraints)
+  │                       ← strictest constraint in the party governs every booking
+  ├── brands{}            (preferred hotel chains / airlines / rail / car + blacklist)
+  ├── loyalty[]           (programmes held: category, tier, member no., typed balance)
+  ├── agency{}            (travel-agency terms — free to use, flat fee per booking)
+  ├── enrichment{}        (public-source suggestions, pending until a human accepts)
   ├── tools{} × 12        (per-service preferences + learned notes)
   └── tours[]
         ├── threads{} keyed by tool
@@ -133,6 +155,25 @@ _A granular checklist of the immediate next steps needed to complete the current
   - [x] Personal facts (diet/allergy/body) forced global from any chat — verified
         a dietary + allergy mention in the transport chat lands on the profile
   - [x] `globalLearned` banner shows what was written to the person
+- [x] **Client feedback round** (2026-08-07)
+  - [x] Travelling party: per-member dietary/allergies/preferences, travelling vs
+        contact-only, books-on-behalf; party-wide allergy union with owner
+        attribution (verified: artist mild + companion severe → severe, named)
+  - [x] Preferred suppliers + never-propose blacklist on the profile and in prompt
+  - [x] Loyalty programmes with category/tier/member no./typed balance;
+        `loyaltyCategory` per service area in `tools.js`
+  - [x] `enforceLoyalty` guard — verified it drops an unheld programme, drops a
+        held programme cited on the wrong category, and strips an invented
+        "earns 12,500 points" claim
+  - [x] Booking channels: direct (free) vs agency (flat fee); fee snapshotted at
+        confirm time; per-tour and per-itinerary fee totals + projection
+  - [x] Agency brief composer — party, allergies with owners, loyalty numbers, and
+        the selected bookings, built from stored facts with no model call
+  - [x] Public-domain enrichment: sourced suggestions with confidence, accept /
+        dismiss per item, unsourced suggestions dropped, health claims barred
+        from becoming constraints
+  - [x] End-to-end verified against live Gemini (party allergy respected, preferred
+        chain surfaced, tier benefit cited, channels attached) and in-browser
 - [ ] Confirm with user: what "when it will come and how it will come" refers to
       (assumed: per-segment arrival time + mode for transfers/deliveries)
 - [ ] Handle remaining edge cases (no dates given, no results, search rate limits)

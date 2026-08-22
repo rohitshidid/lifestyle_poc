@@ -3,6 +3,12 @@
 // Shape:
 //   Profile (a person)
 //     ├── global constraints (dietary, allergies, preferences, learned notes)
+//     ├── party[]   — everyone who travels with them, each with their OWN
+//     │               dietary/allergy/preference constraints
+//     ├── brands{}  — preferred and blacklisted suppliers (hotel chains, airlines…)
+//     ├── loyalty[] — rewards / VIP programmes held, with tier and balance
+//     ├── agency{}  — travel-agency terms (free to use, flat fee per booking)
+//     ├── enrichment{} — public-domain research SUGGESTIONS, never auto-applied
 //     ├── tools{}  — per-tool preferences, so hotel prefs never leak into transport
 //     └── tours[]  — a tour has one thread PER TOOL, and each thread remembers
 //                    its own conversation, decisions, and everything considered
@@ -15,7 +21,14 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
-import { TOOL_IDS, specialistTools, getTool } from "./tools.js";
+import {
+  TOOL_IDS,
+  specialistTools,
+  getTool,
+  BOOKING_CHANNELS,
+  DEFAULT_AGENCY,
+  LOYALTY_CATEGORIES,
+} from "./tools.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, "data");
@@ -93,6 +106,114 @@ export function segmentKey(day, segment) {
   return `${norm(day)}::${norm(segment.title)}`;
 }
 
+// ---------------------------------------------------------------------------
+// Party, brands, loyalty, agency
+//
+// These are the inputs the concierge was missing: who else is travelling and
+// what THEY need, which suppliers the artist actually uses, which rewards
+// programmes a booking should earn on, and how the travel agency is engaged.
+// ---------------------------------------------------------------------------
+
+const BRAND_FIELDS = ["hotelChains", "airlines", "railOperators", "carHire", "avoid"];
+
+function normalizeBrands(b = {}) {
+  const out = {};
+  for (const f of BRAND_FIELDS) out[f] = mergeStrings([], b?.[f]);
+  return out;
+}
+
+/**
+ * A travelling companion. Their constraints are first-class: a tour manager
+ * with a shellfish allergy is exactly as safety-critical as the artist's, and
+ * the whole party eats at the same table.
+ */
+function normalizePartyMember(m) {
+  if (!m) return null;
+  const name = String(m.name || "").trim();
+  if (!name) return null;
+  return {
+    id: m.id || crypto.randomUUID(),
+    name,
+    role: String(m.role || "crew").trim(),
+    travels: m.travels !== false, // on the road by default; false = office-based
+    email: String(m.email || "").trim(),
+    phone: String(m.phone || "").trim(),
+    // Someone who arranges bookings on the artist's behalf — travel manager,
+    // tour manager, assistant. Surfaced so briefs get addressed to them.
+    booksOnBehalf: !!m.booksOnBehalf,
+    dietary: mergeStrings([], m.dietary),
+    allergies: mergeAllergies([], m.allergies),
+    preferences: mergeStrings([], m.preferences),
+    notes: mergeStrings([], m.notes),
+  };
+}
+
+function normalizeLoyalty(l) {
+  if (!l) return null;
+  const program = String(l.program || "").trim();
+  if (!program) return null;
+  const category = LOYALTY_CATEGORIES.includes(String(l.category || "").toLowerCase())
+    ? String(l.category).toLowerCase()
+    : "other";
+  const points = Number(l.points);
+  return {
+    id: l.id || crypto.randomUUID(),
+    program, // "Hilton Honors", "Star Alliance Gold", a venue VIP scheme…
+    category,
+    memberId: String(l.memberId || "").trim(),
+    tier: String(l.tier || "").trim(),
+    points: Number.isFinite(points) && points >= 0 ? points : null,
+    // Only ever moved by a human — see recordPointsActivity.
+    pointsUpdatedAt: l.pointsUpdatedAt || null,
+    perks: mergeStrings([], l.perks),
+    notes: String(l.notes || "").trim(),
+  };
+}
+
+function normalizeAgency(a = {}) {
+  const fee = Number(a?.feePerBooking);
+  return {
+    ...DEFAULT_AGENCY,
+    ...a,
+    enabled: a?.enabled !== false,
+    feePerBooking: Number.isFinite(fee) && fee >= 0 ? fee : DEFAULT_AGENCY.feePerBooking,
+    currency: String(a?.currency || DEFAULT_AGENCY.currency).trim() || DEFAULT_AGENCY.currency,
+    name: String(a?.name || DEFAULT_AGENCY.name).trim() || DEFAULT_AGENCY.name,
+    contact: String(a?.contact || "").trim(),
+  };
+}
+
+/**
+ * Public-domain research output. Suggestions live here in "pending" state and
+ * are NEVER merged into the profile until a human accepts one — a press
+ * interview is not the artist telling us something.
+ */
+function normalizeEnrichment(e = {}) {
+  return {
+    lastRunAt: e?.lastRunAt || null,
+    lastSummary: String(e?.lastSummary || ""),
+    suggestions: (e?.suggestions || [])
+      .map((s) => {
+        const value = typeof s?.value === "string" ? s.value.trim() : s?.value;
+        if (!s?.field || !value) return null;
+        return {
+          id: s.id || crypto.randomUUID(),
+          scope: s.scope === "tool" ? "tool" : "global", // global profile vs one service area
+          toolId: TOOL_IDS.includes(s.toolId) ? s.toolId : null,
+          field: String(s.field), // dietary | otherPreferences | notes | brands.hotelChains | preferences…
+          value,
+          confidence: ["high", "medium", "low"].includes(s.confidence) ? s.confidence : "low",
+          source: String(s.source || "").trim(),
+          sourceUrl: String(s.sourceUrl || "").trim(),
+          quote: String(s.quote || "").trim(),
+          status: ["pending", "accepted", "dismissed"].includes(s.status) ? s.status : "pending",
+          at: s.at || new Date().toISOString(),
+        };
+      })
+      .filter(Boolean),
+  };
+}
+
 function normalizeProfile(p) {
   const tools = {};
   for (const id of TOOL_IDS) {
@@ -111,6 +232,11 @@ function normalizeProfile(p) {
     allergies: (p.allergies || []).map(normalizeAllergy).filter(Boolean),
     otherPreferences: p.otherPreferences || [],
     notes: p.notes || [],
+    party: (p.party || []).map(normalizePartyMember).filter(Boolean),
+    brands: normalizeBrands(p.brands),
+    loyalty: (p.loyalty || []).map(normalizeLoyalty).filter(Boolean),
+    agency: normalizeAgency(p.agency),
+    enrichment: normalizeEnrichment(p.enrichment),
     tools,
     tours: (p.tours || []).map((t) => ({
       ...blankTour(t.name),
@@ -197,9 +323,54 @@ function blankProfile(name) {
     allergies: [],
     otherPreferences: [],
     notes: [],
+    party: [],
+    brands: normalizeBrands(),
+    loyalty: [],
+    agency: normalizeAgency(),
+    enrichment: normalizeEnrichment(),
     tools,
     tours: [],
   };
+}
+
+/**
+ * Everyone whose constraints apply to a booking for this artist: the artist
+ * themselves plus every party member who is actually on the road.
+ *
+ * Used for the allergy boundary — the table is shared, so the strictest
+ * allergy in the travelling party governs every food option, not just the
+ * artist's own.
+ */
+export function travellingParty(profile) {
+  const members = (profile?.party || []).filter((m) => m.travels);
+  return [
+    {
+      id: profile?.id,
+      name: profile?.name || "Artist",
+      role: "artist",
+      dietary: profile?.dietary || [],
+      allergies: profile?.allergies || [],
+      preferences: profile?.otherPreferences || [],
+      isArtist: true,
+    },
+    ...members.map((m) => ({ ...m, isArtist: false })),
+  ];
+}
+
+/** Union of every allergy in the travelling party, escalated to the worst severity seen. */
+export function partyAllergies(profile) {
+  return travellingParty(profile).reduce(
+    (acc, m) => mergeAllergies(acc, m.allergies || []),
+    [],
+  );
+}
+
+/** Which people in the party carry a given allergy — so a warning can name them. */
+export function allergyOwners(profile, allergyName) {
+  const key = String(allergyName || "").toLowerCase();
+  return travellingParty(profile)
+    .filter((m) => (m.allergies || []).some((a) => a.name.toLowerCase() === key))
+    .map((m) => m.name);
 }
 
 export async function listProfiles() {
@@ -245,10 +416,197 @@ export async function updateProfile(id, patch = {}) {
           ? mergeStrings([], patch.otherPreferences)
           : cur.otherPreferences,
       notes: patch.notes !== undefined ? mergeStrings([], patch.notes) : cur.notes,
+      brands: patch.brands !== undefined ? normalizeBrands(patch.brands) : cur.brands,
       updatedAt: new Date().toISOString(),
     };
     await writeAll(profiles);
     return profiles[i];
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Party members
+// ---------------------------------------------------------------------------
+
+/** Add a member, or replace one by id. Their constraints are stored on them. */
+export async function upsertPartyMember(profileId, member = {}) {
+  return serialize(async () => {
+    const profiles = await readAll();
+    const i = profiles.findIndex((p) => p.id === profileId);
+    if (i === -1) return null;
+    const next = normalizePartyMember(member);
+    if (!next) return null;
+
+    const party = profiles[i].party || [];
+    const at = party.findIndex((m) => m.id === next.id);
+    if (at === -1) party.push(next);
+    else party[at] = next;
+
+    profiles[i].party = party;
+    profiles[i].updatedAt = new Date().toISOString();
+    await writeAll(profiles);
+    return profiles[i];
+  });
+}
+
+export async function deletePartyMember(profileId, memberId) {
+  return serialize(async () => {
+    const profiles = await readAll();
+    const i = profiles.findIndex((p) => p.id === profileId);
+    if (i === -1) return null;
+    profiles[i].party = (profiles[i].party || []).filter((m) => m.id !== memberId);
+    profiles[i].updatedAt = new Date().toISOString();
+    await writeAll(profiles);
+    return profiles[i];
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Loyalty programmes
+// ---------------------------------------------------------------------------
+
+export async function upsertLoyalty(profileId, entry = {}) {
+  return serialize(async () => {
+    const profiles = await readAll();
+    const i = profiles.findIndex((p) => p.id === profileId);
+    if (i === -1) return null;
+    const next = normalizeLoyalty(entry);
+    if (!next) return null;
+
+    const loyalty = profiles[i].loyalty || [];
+    const at = loyalty.findIndex((l) => l.id === next.id);
+    if (at === -1) {
+      if (next.points !== null) next.pointsUpdatedAt = new Date().toISOString();
+      loyalty.push(next);
+    } else {
+      // Only stamp the balance date when the balance actually moved.
+      const prev = loyalty[at];
+      next.pointsUpdatedAt =
+        next.points !== prev.points ? new Date().toISOString() : prev.pointsUpdatedAt;
+      loyalty[at] = next;
+    }
+
+    profiles[i].loyalty = loyalty;
+    profiles[i].updatedAt = new Date().toISOString();
+    await writeAll(profiles);
+    return profiles[i];
+  });
+}
+
+export async function deleteLoyalty(profileId, loyaltyId) {
+  return serialize(async () => {
+    const profiles = await readAll();
+    const i = profiles.findIndex((p) => p.id === profileId);
+    if (i === -1) return null;
+    profiles[i].loyalty = (profiles[i].loyalty || []).filter((l) => l.id !== loyaltyId);
+    profiles[i].updatedAt = new Date().toISOString();
+    await writeAll(profiles);
+    return profiles[i];
+  });
+}
+
+/** Programmes that can actually earn on a given service area. */
+export function loyaltyForCategory(profile, category) {
+  if (!category) return [];
+  return (profile?.loyalty || []).filter((l) => l.category === category);
+}
+
+// ---------------------------------------------------------------------------
+// Travel agency terms
+// ---------------------------------------------------------------------------
+
+export async function setAgency(profileId, agency = {}) {
+  return serialize(async () => {
+    const profiles = await readAll();
+    const i = profiles.findIndex((p) => p.id === profileId);
+    if (i === -1) return null;
+    profiles[i].agency = normalizeAgency({ ...profiles[i].agency, ...agency });
+    profiles[i].updatedAt = new Date().toISOString();
+    await writeAll(profiles);
+    return profiles[i];
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Public-domain enrichment
+//
+// Research is stored as SUGGESTIONS only. Accepting one is a separate, human
+// action — that is the whole point: a magazine profile from 2019 is a lead, not
+// a fact about what someone eats today.
+// ---------------------------------------------------------------------------
+
+export async function saveEnrichmentSuggestions(profileId, { suggestions = [], summary = "" }) {
+  return serialize(async () => {
+    const profiles = await readAll();
+    const i = profiles.findIndex((p) => p.id === profileId);
+    if (i === -1) return null;
+
+    const cur = normalizeEnrichment(profiles[i].enrichment);
+    const incoming = normalizeEnrichment({ suggestions }).suggestions;
+
+    // Don't resurrect something the user already dismissed, and don't duplicate
+    // a suggestion that is already on the list.
+    const seen = new Set(
+      cur.suggestions.map((s) => `${s.scope}:${s.toolId || ""}:${s.field}:${String(s.value).toLowerCase()}`),
+    );
+    const fresh = incoming.filter(
+      (s) => !seen.has(`${s.scope}:${s.toolId || ""}:${s.field}:${String(s.value).toLowerCase()}`),
+    );
+
+    profiles[i].enrichment = {
+      lastRunAt: new Date().toISOString(),
+      lastSummary: String(summary || ""),
+      suggestions: [...cur.suggestions, ...fresh],
+    };
+    profiles[i].updatedAt = new Date().toISOString();
+    await writeAll(profiles);
+    return profiles[i];
+  });
+}
+
+/**
+ * Accept or dismiss one researched suggestion. Accepting is the ONLY path from
+ * public-domain research into the profile, and it goes through the same
+ * additive merge as everything else.
+ */
+export async function resolveEnrichmentSuggestion(profileId, suggestionId, accept) {
+  return serialize(async () => {
+    const profiles = await readAll();
+    const i = profiles.findIndex((p) => p.id === profileId);
+    if (i === -1) return null;
+
+    const cur = profiles[i];
+    const s = (cur.enrichment?.suggestions || []).find((x) => x.id === suggestionId);
+    if (!s) return null;
+
+    if (!accept) {
+      s.status = "dismissed";
+      cur.updatedAt = new Date().toISOString();
+      await writeAll(profiles);
+      return cur;
+    }
+
+    const tagged = `${s.value} (public source: ${s.source || "web"})`;
+    if (s.scope === "tool" && TOOL_IDS.includes(s.toolId)) {
+      const bucket = s.field === "notes" ? "notes" : "preferences";
+      cur.tools[s.toolId][bucket] = mergeStrings(cur.tools[s.toolId][bucket], [tagged]);
+    } else if (s.field.startsWith("brands.")) {
+      const key = s.field.slice("brands.".length);
+      if (BRAND_FIELDS.includes(key)) {
+        cur.brands[key] = mergeStrings(cur.brands[key], [s.value]);
+      }
+    } else if (s.field === "dietary") {
+      cur.dietary = mergeStrings(cur.dietary, [s.value]);
+    } else if (s.field === "otherPreferences") {
+      cur.otherPreferences = mergeStrings(cur.otherPreferences, [tagged]);
+    } else {
+      cur.notes = mergeStrings(cur.notes, [tagged]);
+    }
+
+    s.status = "accepted";
+    cur.updatedAt = new Date().toISOString();
+    await writeAll(profiles);
+    return cur;
   });
 }
 
@@ -393,6 +751,30 @@ export async function setOptionStatus(profileId, tourId, toolId, name, status, r
 }
 
 /**
+ * What the travel agency has actually cost on this tour.
+ *
+ * Only confirmed bookings count. A segment the concierge merely proposed has
+ * cost nothing, and showing a fee against it would overstate the bill.
+ */
+export function summariseFees(profile, tour) {
+  const agency = normalizeAgency(profile?.agency);
+  const rows = Object.values(tour?.confirmations || {});
+  const viaAgency = rows.filter((c) => c.channel === BOOKING_CHANNELS.AGENCY);
+  const charged = viaAgency.reduce((sum, c) => sum + (Number(c.fee) || 0), 0);
+
+  return {
+    currency: agency.currency,
+    feePerBooking: agency.feePerBooking,
+    agencyBookings: viaAgency.length,
+    directBookings: rows.length - viaAgency.length,
+    charged,
+    // What it would cost to place everything still unbooked through the agency
+    // is computed against the live itinerary in server.js, where the segment
+    // list is known.
+  };
+}
+
+/**
  * Everything the master Tour Planner needs to compose one trip: what each
  * specialist thread has locked in and which options were chosen there. This is
  * what makes the planner a *combination* of the other chats rather than a
@@ -430,6 +812,8 @@ export async function getTourSummary(profileId, tourId) {
     areas,
     itinerary: tour.itinerary || null,
     confirmations: tour.confirmations || {},
+    agency: profile.agency,
+    fees: summariseFees(profile, tour),
     // Flat list of every option the user has actually chosen in a specialist
     // chat — used to derive whether a segment is merely planned or selected.
     chosenNames: areas.flatMap((a) => a.chosen.map((c) => c.name)),
@@ -439,9 +823,19 @@ export async function getTourSummary(profileId, tourId) {
 /**
  * Record that the user actually booked a segment. This is the ONLY way a
  * segment becomes "confirmed" — no model output can produce this state.
- * Pass `null` as reference to clear a confirmation.
+ *
+ * `channel` records HOW it was booked. Booking direct is free; the agency
+ * charges its flat fee per booking it places, and that is where the fee total
+ * comes from — fees are counted on real bookings, never on proposals.
  */
-export async function confirmSegment(profileId, tourId, key, reference = "", confirmed = true) {
+export async function confirmSegment(
+  profileId,
+  tourId,
+  key,
+  reference = "",
+  confirmed = true,
+  channel = BOOKING_CHANNELS.DIRECT,
+) {
   return serialize(async () => {
     const profiles = await readAll();
     const pi = profiles.findIndex((p) => p.id === profileId);
@@ -452,9 +846,17 @@ export async function confirmSegment(profileId, tourId, key, reference = "", con
     const tour = profiles[pi].tours[ti];
     tour.confirmations = tour.confirmations || {};
     if (confirmed) {
+      const via =
+        channel === BOOKING_CHANNELS.AGENCY ? BOOKING_CHANNELS.AGENCY : BOOKING_CHANNELS.DIRECT;
+      const agency = normalizeAgency(profiles[pi].agency);
       tour.confirmations[key] = {
         at: new Date().toISOString(),
         reference: String(reference || "").trim(),
+        channel: via,
+        // Snapshot the fee that applied at booking time — the agency's terms
+        // may change later, but what was charged does not.
+        fee: via === BOOKING_CHANNELS.AGENCY ? agency.feePerBooking : 0,
+        currency: agency.currency,
       };
     } else {
       delete tour.confirmations[key];
@@ -505,6 +907,26 @@ export async function mergeLearnings(profileId, toolId, learnings = {}) {
     cur.allergies = mergeAllergies(cur.allergies, g.allergies);
     cur.otherPreferences = mergeStrings(cur.otherPreferences, g.otherPreferences);
     cur.notes = mergeStrings(cur.notes, g.notes);
+
+    // Supplier loyalty stated in conversation ("we're a Hilton family") is a
+    // durable brand preference, so it lands on the profile like any other.
+    for (const f of BRAND_FIELDS) {
+      cur.brands[f] = mergeStrings(cur.brands[f], g.brands?.[f]);
+    }
+
+    // Constraints picked up about a NAMED travelling companion go on that
+    // person, not on the artist — matched by name, and never creating someone
+    // the user never entered.
+    for (const upd of learnings.party || []) {
+      const name = String(upd?.name || "").trim().toLowerCase();
+      if (!name) continue;
+      const member = (cur.party || []).find((m) => m.name.toLowerCase() === name);
+      if (!member) continue; // party membership is entered by a human, not inferred
+      member.dietary = mergeStrings(member.dietary, upd.dietary);
+      member.allergies = mergeAllergies(member.allergies, upd.allergies);
+      member.preferences = mergeStrings(member.preferences, upd.preferences);
+      member.notes = mergeStrings(member.notes, upd.notes);
+    }
 
     if (TOOL_IDS.includes(toolId)) {
       cur.tools[toolId].preferences = mergeStrings(cur.tools[toolId].preferences, t.preferences);

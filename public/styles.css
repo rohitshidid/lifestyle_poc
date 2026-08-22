@@ -628,3 +628,263 @@ details.section > .inner { padding-top: 12px; }
   margin-top: 5px;
   font-variant-numeric: tabular-nums;
 }
+
+/* =========================================================================
+   Party, suppliers, rewards, agency, research
+   ========================================================================= */
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.check input { accent-color: var(--accent); }
+
+/* --- travelling party --- */
+
+.party-item {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 9px;
+  background: var(--panel-2);
+}
+/* A severe allergy anywhere in the party governs every food booking, so it
+   is marked on the person carrying it. */
+.party-item.has-severe { border-color: rgba(217,112,95,0.45); }
+.pi-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.pi-head .nm { font-weight: 600; font-size: 0.9rem; }
+.party-item .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+
+.role-badge {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 20px;
+  border: 1px solid var(--line-2);
+  color: var(--muted);
+}
+.role-badge.muted { opacity: 0.7; font-style: italic; }
+.role-badge.books { border-color: var(--accent); color: var(--accent); }
+
+/* --- suppliers --- */
+
+.chip.avoid {
+  border-color: rgba(217,112,95,0.5);
+  color: var(--danger);
+  text-decoration: line-through;
+}
+
+/* --- rewards programmes --- */
+
+.loyalty-item {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 9px 11px;
+  margin-bottom: 8px;
+  background: var(--panel-2);
+}
+.li-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.li-head .nm { font-weight: 600; font-size: 0.88rem; }
+.li-meta { color: var(--muted); font-size: 0.79rem; margin-top: 3px; }
+.li-meta .as-of { opacity: 0.75; font-style: italic; }
+
+.cat-badge, .tier-badge {
+  font-size: 0.68rem;
+  padding: 2px 7px;
+  border-radius: 20px;
+  border: 1px solid var(--line-2);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.tier-badge { border-color: var(--accent); color: var(--accent); }
+
+.loyalty-line {
+  margin-top: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  border: 1px solid rgba(224,164,88,0.28);
+  font-size: 0.83rem;
+}
+.loyalty-line .star { color: var(--accent); margin-right: 4px; }
+.loyalty-perk { color: var(--text); font-size: 0.8rem; margin-top: 3px; }
+.loyalty-note { color: var(--muted); font-size: 0.78rem; margin-top: 3px; }
+
+.earn {
+  font-size: 0.7rem;
+  padding: 1px 7px;
+  border-radius: 20px;
+  border: 1px solid var(--line-2);
+  color: var(--muted);
+  margin-left: 5px;
+}
+.earn.yes { border-color: var(--good); color: var(--good); }
+.earn.unknown { border-color: var(--warn); color: var(--warn); }
+
+.serves { color: var(--good); font-size: 0.81rem; margin-top: 6px; }
+
+/* --- booking channels --- */
+
+.booking-line {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px dashed var(--line);
+}
+.book-direct {
+  font-size: 0.79rem;
+  color: var(--good);
+  text-decoration: none;
+  border: 1px solid rgba(111,177,160,0.4);
+  border-radius: 7px;
+  padding: 3px 9px;
+}
+.book-direct:hover { background: rgba(111,177,160,0.1); }
+.book-none { font-size: 0.79rem; color: var(--muted); font-style: italic; }
+.book-agency {
+  font-size: 0.79rem;
+  color: var(--muted);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  padding: 3px 9px;
+}
+.book-agency.rec { border-color: var(--accent); color: var(--accent); }
+.rec-tag {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-left: 5px;
+}
+.agency-reason { color: var(--muted); font-size: 0.78rem; margin-top: 5px; }
+
+/* --- itinerary fees --- */
+
+.fee-bar {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  padding: 11px 14px;
+  margin-bottom: 16px;
+}
+.fee-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.fee-num {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.fee-label { color: var(--muted); font-size: 0.83rem; }
+.fee-note { color: var(--muted); font-size: 0.8rem; margin-top: 6px; }
+
+.brief-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 0.84rem;
+}
+.brief-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.brief-check input { accent-color: var(--accent); }
+.brief-text {
+  width: 100%;
+  min-height: 260px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  margin-top: 10px;
+}
+
+.seg-party { color: var(--muted); font-size: 0.81rem; margin-top: 4px; }
+.seg-loyalty { color: var(--accent); font-size: 0.8rem; margin-top: 4px; }
+.seg-agency-rec {
+  color: var(--accent);
+  font-size: 0.79rem;
+  margin-top: 5px;
+}
+
+/* --- public research --- */
+
+.enrich-summary { margin-top: 10px; }
+.suggestion {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-2);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-top: 9px;
+  background: var(--panel-2);
+}
+/* Confidence is shown on the edge because the whole point of this panel is
+   that these are leads of varying quality, not facts. */
+.suggestion.conf-high { border-left-color: var(--good); }
+.suggestion.conf-medium { border-left-color: var(--warn); }
+.suggestion.conf-low { border-left-color: var(--line-2); }
+.sg-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.sg-field {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.conf-badge {
+  font-size: 0.67rem;
+  padding: 1px 7px;
+  border-radius: 20px;
+  border: 1px solid var(--line-2);
+  color: var(--muted);
+}
+.conf-badge.conf-high { border-color: var(--good); color: var(--good); }
+.conf-badge.conf-medium { border-color: var(--warn); color: var(--warn); }
+.sg-value { font-size: 0.89rem; margin-top: 4px; }
+.sg-quote {
+  color: var(--muted);
+  font-size: 0.79rem;
+  font-style: italic;
+  margin: 5px 0 6px;
+  padding-left: 9px;
+  border-left: 2px solid var(--line);
+}
+
+/* --- modal --- */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.62);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 50;
+}
+.modal-box {
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  width: min(660px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+}
+.modal-box h2 { margin: 0 0 12px; font-size: 1rem; }
