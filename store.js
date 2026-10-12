@@ -38,7 +38,32 @@ const DB_PATH = path.join(DATA_DIR, "profiles.json");
 // read-modify-write and lose an update.
 let writeQueue = Promise.resolve();
 
+// Storage: Postgres when DATABASE_URL is set (hosted), otherwise the local JSON
+// file. Postgres holds the whole profile list as one JSONB row, so the
+// read-modify-write shape callers rely on is unchanged.
+let pool = null;
+async function getPool() {
+  if (!process.env.DATABASE_URL) return null;
+  if (!pool) {
+    const { default: pg } = await import("pg");
+    pool = new pg.Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+      max: 3,
+    });
+    await pool.query(
+      "CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value JSONB NOT NULL)"
+    );
+  }
+  return pool;
+}
+
 async function readAll() {
+  const db = await getPool();
+  if (db) {
+    const { rows } = await db.query("SELECT value FROM kv WHERE key = 'profiles'");
+    return (rows[0]?.value || []).map(normalizeProfile);
+  }
   try {
     const parsed = JSON.parse(await fs.readFile(DB_PATH, "utf8"));
     return parsed.map(normalizeProfile);
@@ -49,6 +74,15 @@ async function readAll() {
 }
 
 async function writeAll(profiles) {
+  const db = await getPool();
+  if (db) {
+    await db.query(
+      `INSERT INTO kv (key, value) VALUES ('profiles', $1::jsonb)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [JSON.stringify(profiles)]
+    );
+    return;
+  }
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(DB_PATH, JSON.stringify(profiles, null, 2));
 }

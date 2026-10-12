@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: lifestyle-poc
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
